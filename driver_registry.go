@@ -11,6 +11,7 @@ import (
 // DriverRegistry is a concurrency-safe registry of driver definitions.
 type DriverRegistry struct {
 	mu          sync.RWMutex
+	aliases     map[DriverType]DriverType
 	definitions map[DriverType]registeredDriverDefinition
 }
 
@@ -23,6 +24,7 @@ type registeredDriverDefinition struct {
 // NewDriverRegistry returns an empty driver registry.
 func NewDriverRegistry() *DriverRegistry {
 	return &DriverRegistry{
+		aliases:     make(map[DriverType]DriverType, 4),
 		definitions: make(map[DriverType]registeredDriverDefinition, 8),
 	}
 }
@@ -51,6 +53,9 @@ func (r *DriverRegistry) Register(definition DriverDefinition) error {
 	if _, exists := r.definitions[descriptor.Type]; exists {
 		return fmt.Errorf("benefit: driver type %q is already registered", descriptor.Type)
 	}
+	if _, exists := r.aliases[descriptor.Type]; exists {
+		return fmt.Errorf("benefit: driver type %q is already registered as an alias", descriptor.Type)
+	}
 
 	r.definitions[descriptor.Type] = registeredDriverDefinition{
 		definition: definition,
@@ -67,21 +72,76 @@ func (r *DriverRegistry) MustRegister(definition DriverDefinition) {
 	}
 }
 
-// Unregister removes a definition and reports whether it existed.
+// RegisterAlias registers aliasType as a deprecated alias for an already
+// registered canonicalType. Alias targets must be canonical definitions rather
+// than other aliases.
+func (r *DriverRegistry) RegisterAlias(aliasType, canonicalType DriverType) error {
+	if r == nil {
+		return errors.New("benefit: driver registry is nil")
+	}
+	if err := aliasType.Validate(); err != nil {
+		return err
+	}
+	if err := canonicalType.Validate(); err != nil {
+		return err
+	}
+	if aliasType == canonicalType {
+		return fmt.Errorf("benefit: driver alias %q must differ from its canonical type", aliasType)
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.definitions[canonicalType]; !exists {
+		if target, alias := r.aliases[canonicalType]; alias {
+			const msg = "benefit: driver alias target %q is an alias for %q"
+			return fmt.Errorf(msg, canonicalType, target)
+		}
+		return fmt.Errorf("benefit: driver alias target %q is not registered", canonicalType)
+	}
+	if _, exists := r.definitions[aliasType]; exists {
+		return fmt.Errorf("benefit: driver alias %q is already registered as a definition", aliasType)
+	}
+	if target, exists := r.aliases[aliasType]; exists {
+		return fmt.Errorf("benefit: driver alias %q is already registered for %q", aliasType, target)
+	}
+
+	r.aliases[aliasType] = canonicalType
+	return nil
+}
+
+// Unregister removes a definition or alias and reports whether it existed.
+// Removing a canonical definition also removes all aliases that target it.
 func (r *DriverRegistry) Unregister(driverType DriverType) bool {
 	if r == nil {
 		return false
 	}
 
 	r.mu.Lock()
-	_, exists := r.definitions[driverType]
-	delete(r.definitions, driverType)
-	r.mu.Unlock()
+	defer r.mu.Unlock()
 
-	return exists
+	if _, exists := r.aliases[driverType]; exists {
+		delete(r.aliases, driverType)
+		return true
+	}
+
+	if _, exists := r.definitions[driverType]; !exists {
+		return false
+	}
+
+	delete(r.definitions, driverType)
+	for aliasType, canonicalType := range r.aliases {
+		if canonicalType == driverType {
+			delete(r.aliases, aliasType)
+		}
+	}
+
+	return true
 }
 
 // Get returns a registered definition.
+//
+// NOTE: Aliases resolve to their canonical definitions.
 func (r *DriverRegistry) Get(driverType DriverType) (DriverDefinition, bool) {
 	registered, ok := r.get(driverType)
 	return registered.definition, ok
@@ -101,13 +161,19 @@ func (r *DriverRegistry) get(driverType DriverType) (registeredDriverDefinition,
 	}
 
 	r.mu.RLock()
+	if canonicalType, exists := r.aliases[driverType]; exists {
+		driverType = canonicalType
+	}
 	registered, ok := r.definitions[driverType]
 	r.mu.RUnlock()
 
 	return registered, ok
 }
 
-// Descriptors returns all descriptors sorted by driver type.
+// Descriptors returns all canonical descriptors sorted by driver type.
+//
+// NOTE: Aliases are intentionally omitted so deprecated types are not offered
+// for new use.
 func (r *DriverRegistry) Descriptors() []DriverDescriptor {
 	if r == nil {
 		return nil
@@ -226,6 +292,13 @@ var DefaultDriverRegistry = NewDriverRegistry()
 // RegisterDriver registers a definition in the package-level registry.
 func RegisterDriver(definition DriverDefinition) error {
 	return DefaultDriverRegistry.Register(definition)
+}
+
+// RegisterDriverAlias registers a deprecated alias in the package-level registry.
+//
+// The canonical type must already be registered.
+func RegisterDriverAlias(aliasType, canonicalType DriverType) error {
+	return DefaultDriverRegistry.RegisterAlias(aliasType, canonicalType)
 }
 
 // ValidateDriverConfig validates configuration with the package-level registry.

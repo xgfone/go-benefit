@@ -38,6 +38,12 @@ a stable namespaced value composed from the provider and benefit kind, such as
 two dot-separated segments; each segment uses lower-case letters, digits,
 underscores, or hyphens and must start with a letter or digit.
 
+When a driver type is renamed, register the new canonical definition and then
+register the old type as an alias with `DriverRegistry.RegisterAlias`. Registry
+lookups, configuration validation, and binding accept the alias but resolve it
+to the canonical definition. Bound drivers report the canonical type, and
+`Descriptors` omits aliases so deprecated types are not offered for new use.
+
 Management applications use `ConfigSchema` to render configuration forms and
 call `ValidateConfig` before encrypting and persisting operator input. A
 `DriverConfig` is either empty, when the schema permits it, or a UTF-8 JSON
