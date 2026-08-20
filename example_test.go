@@ -300,7 +300,9 @@ func (d *exampleCouponDriver) Reverse(
 func Example() {
 	ctx := context.Background()
 	registry := benefit.NewDriverRegistry()
-	registry.MustRegister(exampleDriverDefinition{})
+	if err := registry.Register(exampleDriverDefinition{}); err != nil {
+		panic(err)
+	}
 
 	if _, ok := registry.ConfigSchema(exampleDriverType); !ok {
 		panic("config schema is unavailable")

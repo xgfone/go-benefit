@@ -65,13 +65,6 @@ func (r *DriverRegistry) Register(definition DriverDefinition) error {
 	return nil
 }
 
-// MustRegister adds a definition and panics on failure.
-func (r *DriverRegistry) MustRegister(definition DriverDefinition) {
-	if err := r.Register(definition); err != nil {
-		panic(err)
-	}
-}
-
 // RegisterAlias registers aliasType as a deprecated alias for an already
 // registered canonicalType. Alias targets must be canonical definitions rather
 // than other aliases.

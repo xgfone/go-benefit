@@ -84,7 +84,9 @@ func TestDriverRegistry(t *testing.T) {
 func TestDriverRegistryAlias(t *testing.T) {
 	registry := benefit.NewDriverRegistry()
 	definition := newFakeDefinition("coupon_v2", true, true)
-	registry.MustRegister(definition)
+	if err := registry.Register(definition); err != nil {
+		t.Fatal(err)
+	}
 	if err := registry.RegisterAlias("test.coupon", "test.coupon_v2"); err != nil {
 		t.Fatal(err)
 	}
@@ -131,8 +133,12 @@ func TestDriverRegistryRejectsInvalidAliases(t *testing.T) {
 	}
 
 	registry := benefit.NewDriverRegistry()
-	registry.MustRegister(newFakeDefinition("coupon_v2", false, false))
-	registry.MustRegister(newFakeDefinition("other", false, false))
+	if err := registry.Register(newFakeDefinition("coupon_v2", false, false)); err != nil {
+		t.Fatal(err)
+	}
+	if err := registry.Register(newFakeDefinition("other", false, false)); err != nil {
+		t.Fatal(err)
+	}
 
 	invalid := []struct {
 		alias     benefit.DriverType
@@ -167,7 +173,9 @@ func TestDriverRegistryRejectsInvalidAliases(t *testing.T) {
 func TestDriverRegistryUnregisterAlias(t *testing.T) {
 	registry := benefit.NewDriverRegistry()
 	definition := newFakeDefinition("coupon_v2", false, false)
-	registry.MustRegister(definition)
+	if err := registry.Register(definition); err != nil {
+		t.Fatal(err)
+	}
 	if err := registry.RegisterAlias("test.coupon", "test.coupon_v2"); err != nil {
 		t.Fatal(err)
 	}
