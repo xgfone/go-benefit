@@ -73,8 +73,18 @@ func TestExtractedAmountAndScopeConstraints(t *testing.T) {
 		Context: operationContext,
 	}
 	registry := benefit.NewConstraintRegistry()
-	registry.MustRegister(benefit.ConstraintMinimumAmount, benefit.NewMinimumAmountConstraintEvaluator(extractTestAmount))
-	registry.MustRegister(productScope, benefit.NewScopeConstraintEvaluator(extractTestProducts))
+	if err := registry.Register(
+		benefit.ConstraintMinimumAmount,
+		benefit.NewMinimumAmountConstraintEvaluator(extractTestAmount),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := registry.Register(
+		productScope,
+		benefit.NewScopeConstraintEvaluator(extractTestProducts),
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	report := registry.EvaluateAll(
 		context.Background(),
@@ -96,7 +106,12 @@ func TestAmountConstraintRejectsCurrencyMismatch(t *testing.T) {
 	}
 	input := benefit.EvaluationInput{Context: operationContext}
 	registry := benefit.NewConstraintRegistry()
-	registry.MustRegister(benefit.ConstraintMinimumAmount, benefit.NewMinimumAmountConstraintEvaluator(extractTestAmount))
+	if err := registry.Register(
+		benefit.ConstraintMinimumAmount,
+		benefit.NewMinimumAmountConstraintEvaluator(extractTestAmount),
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	result := registry.Evaluate(context.Background(), minimum, input)
 	if result.IsSatisfied() || result.Code != benefit.ConstraintResultUnsatisfied {
@@ -193,13 +208,15 @@ func TestConstraintRegistryEvaluatorError(t *testing.T) {
 
 func TestConstraintRegistryValidatesDecisionCode(t *testing.T) {
 	registry := benefit.NewConstraintRegistry()
-	registry.MustRegister("test.success", benefit.ConstraintEvaluatorFunc(func(
+	if err := registry.Register("test.success", benefit.ConstraintEvaluatorFunc(func(
 		context.Context,
 		benefit.Constraint,
 		benefit.EvaluationInput,
 	) (benefit.ConstraintDecision, error) {
 		return benefit.ConstraintSatisfied("eligible", nil), nil
-	}))
+	})); err != nil {
+		t.Fatal(err)
+	}
 
 	success := registry.Evaluate(context.Background(), benefit.Constraint{Type: "test.success"}, benefit.EvaluationInput{})
 	if !success.IsSatisfied() || success.Code != benefit.ConstraintResultSatisfied {
@@ -213,13 +230,15 @@ func TestConstraintRegistryValidatesDecisionCode(t *testing.T) {
 	}
 	for i, code := range invalidCodes {
 		typ := benefit.ConstraintType(fmt.Sprintf("test.invalid_%d", i))
-		registry.MustRegister(typ, benefit.ConstraintEvaluatorFunc(func(
+		if err := registry.Register(typ, benefit.ConstraintEvaluatorFunc(func(
 			context.Context,
 			benefit.Constraint,
 			benefit.EvaluationInput,
 		) (benefit.ConstraintDecision, error) {
 			return benefit.ConstraintDecision{Code: code}, nil
-		}))
+		})); err != nil {
+			t.Fatal(err)
+		}
 
 		result := registry.Evaluate(context.Background(), benefit.Constraint{Type: typ}, benefit.EvaluationInput{})
 		if result.IsSatisfied() || result.Code != benefit.ConstraintResultError {

@@ -107,14 +107,18 @@ func (exampleDriverDefinition) CompileConfig(raw benefit.DriverConfig) (benefit.
 
 	constraints := benefit.Constraints{minimum, merchant}
 	constraintRegistry := benefit.NewConstraintRegistry()
-	constraintRegistry.MustRegister(
+	if err := constraintRegistry.Register(
 		benefit.ConstraintMinimumAmount,
 		benefit.NewMinimumAmountConstraintEvaluator(extractExampleAmount),
-	)
-	constraintRegistry.MustRegister(
+	); err != nil {
+		return nil, err
+	}
+	if err := constraintRegistry.Register(
 		exampleMerchantConstraint,
 		benefit.NewScopeConstraintEvaluator(extractExampleMerchant),
-	)
+	); err != nil {
+		return nil, err
+	}
 
 	return benefit.DriverFactoryFunc(func() (benefit.Driver, error) {
 		return &exampleCouponDriver{

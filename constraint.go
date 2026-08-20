@@ -253,13 +253,6 @@ func (r *ConstraintRegistry) Register(typ ConstraintType, evaluator ConstraintEv
 	return nil
 }
 
-// MustRegister adds an evaluator and panics on failure.
-func (r *ConstraintRegistry) MustRegister(typ ConstraintType, evaluator ConstraintEvaluator) {
-	if err := r.Register(typ, evaluator); err != nil {
-		panic(err)
-	}
-}
-
 // Unregister removes an evaluator and reports whether it existed.
 func (r *ConstraintRegistry) Unregister(typ ConstraintType) bool {
 	if r == nil {
