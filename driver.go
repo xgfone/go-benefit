@@ -78,7 +78,7 @@ type DriverDefinition interface {
 	// ConfigSchema must return an equivalent schema on every call.
 	ConfigSchema() ConfigSchema
 
-	ValidateConfig(context.Context, DriverConfig) error
+	ValidateConfig(ctx context.Context, conf DriverConfig) (err error)
 
 	// CompileConfig validates, parses, and compiles config independently
 	// of ValidateConfig, which DriverRegistry.Bind does not call. It is
@@ -86,7 +86,7 @@ type DriverDefinition interface {
 	// equivalent factories or errors without network or time dependencies.
 	//
 	// Implementations must be safe for concurrent use.
-	CompileConfig(DriverConfig) (DriverFactory, error)
+	CompileConfig(conf DriverConfig) (factory DriverFactory, err error)
 }
 
 // Driver is a provider-bound benefit adapter.
@@ -106,15 +106,15 @@ type Driver interface {
 	// that constructed the driver.
 	Descriptor() DriverDescriptor
 
-	Inspect(context.Context, InspectRequest) (BenefitInfo, error)
-	Evaluate(context.Context, EvaluateRequest) (EvaluationResult, error)
-	Redeem(context.Context, RedeemRequest) (RedeemResult, error)
+	Inspect(ctx context.Context, req InspectRequest) (info BenefitInfo, err error)
+	Evaluate(ctx context.Context, req EvaluateRequest) (result EvaluationResult, err error)
+	Redeem(ctx context.Context, req RedeemRequest) (result RedeemResult, err error)
 }
 
 // Reverser is optionally implemented by drivers that support reversing a
 // confirmed redemption.
 type Reverser interface {
-	Reverse(context.Context, ReverseRequest) (ReverseResult, error)
+	Reverse(ctx context.Context, req ReverseRequest) (result ReverseResult, err error)
 }
 
 // InspectRequest identifies the benefit to inspect.
