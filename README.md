@@ -1,7 +1,9 @@
 # Benefit Redemption Framework for Go
 
 [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-benefit)](https://pkg.go.dev/github.com/xgfone/go-benefit)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-benefit/main/LICENSE)
+![Minimum Go Version](https://img.shields.io/github/go-mod/go-version/xgfone/go-benefit?label=Go%2B)
+![Latest SemVer](https://img.shields.io/github/v/tag/xgfone/go-benefit?sort=semver)
 
 `go-benefit` is a provider-neutral framework for inspecting, evaluating,
 redeeming, and optionally reversing one benefit at a time. It supports coupons,
@@ -10,7 +12,7 @@ benefits without imposing one transaction or product model on applications.
 
 ## Scope
 
-Every driver implements `Inspect`, `Evaluate`, and `Redeem`; `Reverse` is an
+Every driver implements the interface `Driver`; `Reverser` is an
 optional capability. No result-query operation is currently defined. Future
 result-query operations can be added as optional capabilities without expanding
 the core `Driver` interface. The package provides driver registration and
@@ -32,9 +34,9 @@ go get github.com/xgfone/go-benefit
 
 A `DriverDefinition` describes one registrable driver type. Its `DriverType` is
 a stable namespaced value composed from the provider and benefit kind, such as
-`youzan.coupon`. Open machine identifiers contain at least two dot-separated
-segments; each segment uses lower-case letters, digits, underscores, or hyphens
-and must start with a letter or digit.
+`douyin.coupon` or `meituan.coupon`. Open machine identifiers contain at least
+two dot-separated segments; each segment uses lower-case letters, digits,
+underscores, or hyphens and must start with a letter or digit.
 
 Management applications use `ConfigSchema` to render configuration forms and
 call `ValidateConfig` before encrypting and persisting operator input. A
