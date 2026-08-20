@@ -41,10 +41,12 @@ func (exampleDriverDefinition) Descriptor() benefit.DriverDescriptor {
 			Type: "coupon",
 			Name: "Coupon",
 		},
-		Operations: benefit.OperationSupports{{
-			Operation: benefit.OperationReverse,
-			Supported: true,
-		}},
+		Operations: benefit.OperationSupports{
+			benefit.OperationSupport{
+				Operation: benefit.OperationReverse,
+				Supported: true,
+			},
+		},
 	}
 }
 

@@ -15,7 +15,7 @@ func TestEffectiveOperationSupportsOnlyNarrowsCapabilities(t *testing.T) {
 		modeAutomatic benefit.OperationMode = "automatic"
 	)
 	declared := benefit.OperationSupports{
-		{
+		benefit.OperationSupport{
 			Operation: operationArchive,
 			Supported: true,
 			Modes: []benefit.OperationMode{
@@ -23,7 +23,7 @@ func TestEffectiveOperationSupportsOnlyNarrowsCapabilities(t *testing.T) {
 				modeAutomatic,
 			},
 		},
-		{
+		benefit.OperationSupport{
 			Operation: benefit.OperationReverse,
 			Supported: true,
 			Modes: []benefit.OperationMode{
@@ -32,12 +32,12 @@ func TestEffectiveOperationSupportsOnlyNarrowsCapabilities(t *testing.T) {
 		},
 	}
 	restrictions := benefit.OperationSupports{
-		{
+		benefit.OperationSupport{
 			Operation: operationArchive,
 			Supported: true,
 			Modes:     []benefit.OperationMode{modeManual},
 		},
-		{
+		benefit.OperationSupport{
 			Operation: benefit.OperationReverse,
 			Supported: false,
 			Reason:    "this benefit is non-reversible",
@@ -86,15 +86,19 @@ func TestReverseOperationModes(t *testing.T) {
 }
 
 func TestEffectiveOperationSupportsNarrowsPartialReverse(t *testing.T) {
-	declared := benefit.OperationSupports{{
-		Operation: benefit.OperationReverse,
-		Supported: true,
-		Modes:     []benefit.OperationMode{benefit.OperationModeReversePartial},
-	}}
-	restrictions := benefit.OperationSupports{{
-		Operation: benefit.OperationReverse,
-		Supported: true,
-	}}
+	declared := benefit.OperationSupports{
+		benefit.OperationSupport{
+			Operation: benefit.OperationReverse,
+			Supported: true,
+			Modes:     []benefit.OperationMode{benefit.OperationModeReversePartial},
+		},
+	}
+	restrictions := benefit.OperationSupports{
+		benefit.OperationSupport{
+			Operation: benefit.OperationReverse,
+			Supported: true,
+		},
+	}
 
 	effective, err := benefit.EffectiveOperationSupports(declared, restrictions)
 	if err != nil {
@@ -113,14 +117,18 @@ func TestEffectiveOperationSupportsNarrowsPartialReverse(t *testing.T) {
 }
 
 func TestEffectiveOperationSupportsRejectsExpansion(t *testing.T) {
-	declared := benefit.OperationSupports{{
-		Operation: benefit.OperationReverse,
-		Supported: true,
-	}}
-	restriction := benefit.OperationSupports{{
-		Operation: "Archive",
-		Supported: true,
-	}}
+	declared := benefit.OperationSupports{
+		benefit.OperationSupport{
+			Operation: benefit.OperationReverse,
+			Supported: true,
+		},
+	}
+	restriction := benefit.OperationSupports{
+		benefit.OperationSupport{
+			Operation: "Archive",
+			Supported: true,
+		},
+	}
 
 	if _, err := benefit.EffectiveOperationSupports(declared, restriction); err == nil {
 		t.Fatal("capability expansion unexpectedly succeeded")

@@ -132,13 +132,15 @@ func TestConstraintsAndOperationsMarshalAsLists(t *testing.T) {
 	value := benefit.BenefitInfo{
 		Status:     benefit.StatusActive,
 		DriverType: "test.coupon",
-		Constraints: benefit.Constraints{{
-			Type: "test.provider_rule",
-		}},
-		Operations: benefit.OperationSupports{{
-			Operation: benefit.OperationReverse,
-			Supported: true,
-		}},
+		Constraints: benefit.Constraints{
+			benefit.Constraint{Type: "test.provider_rule"},
+		},
+		Operations: benefit.OperationSupports{
+			benefit.OperationSupport{
+				Operation: benefit.OperationReverse,
+				Supported: true,
+			},
+		},
 	}
 	data, err := json.Marshal(value)
 	if err != nil {
