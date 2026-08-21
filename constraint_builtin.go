@@ -22,19 +22,12 @@ func RegisterBuiltinConstraintEvaluators(registry *ConstraintRegistry) error {
 }
 
 func invalidConstraint(message string) ConstraintDecision {
-	return ConstraintUnsatisfied(ConstraintResultInvalid, message, nil)
+	return ConstraintUnsatisfied(ConstraintDecisionInvalid, message, nil)
 }
 
-func constraintDecision(satisfied bool, message string, details map[string]any) ConstraintDecision {
+func constraintDecision(satisfied bool, reason string, details map[string]any) ConstraintDecision {
 	if satisfied {
-		return ConstraintSatisfied(message, details)
+		return ConstraintSatisfied()
 	}
-	return ConstraintUnsatisfied(ConstraintResultUnsatisfied, message, details)
-}
-
-func chooseMessage(condition bool, yes, no string) string {
-	if condition {
-		return yes
-	}
-	return no
+	return ConstraintUnsatisfied(ConstraintDecisionUnsatisfied, reason, details)
 }

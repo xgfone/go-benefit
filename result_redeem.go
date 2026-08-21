@@ -6,37 +6,34 @@ import (
 	"time"
 )
 
-// RedeemFailureType is the stable business classification of a redeem failure.
-type RedeemFailureType string
+// RedeemFailureCode is the stable business classification of a redeem failure.
+type RedeemFailureCode string
 
 const (
-	RedeemFailureConstraintUnsatisfied RedeemFailureType = "constraint.unsatisfied"
+	RedeemFailureConstraintUnsatisfied RedeemFailureCode = "constraint.unsatisfied"
 
-	RedeemFailureBenefitNotFound  RedeemFailureType = "benefit.not_found"
-	RedeemFailureBenefitPending   RedeemFailureType = "benefit.pending" // NotStarted
-	RedeemFailureBenefitSuspended RedeemFailureType = "benefit.suspended"
-	RedeemFailureBenefitExhausted RedeemFailureType = "benefit.exhausted" // commonly for multi-use benefits
-	RedeemFailureBenefitRedeemed  RedeemFailureType = "benefit.redeemed"  // commonly for single-use benefits
-	RedeemFailureBenefitExpired   RedeemFailureType = "benefit.expired"
-	RedeemFailureBenefitVoided    RedeemFailureType = "benefit.voided"
+	RedeemFailureBenefitNotFound  RedeemFailureCode = "benefit.not_found"
+	RedeemFailureBenefitPending   RedeemFailureCode = "benefit.pending" // NotStarted
+	RedeemFailureBenefitSuspended RedeemFailureCode = "benefit.suspended"
+	RedeemFailureBenefitExhausted RedeemFailureCode = "benefit.exhausted" // commonly for multi-use benefits
+	RedeemFailureBenefitRedeemed  RedeemFailureCode = "benefit.redeemed"  // commonly for single-use benefits
+	RedeemFailureBenefitExpired   RedeemFailureCode = "benefit.expired"
+	RedeemFailureBenefitVoided    RedeemFailureCode = "benefit.voided"
 
-	RedeemFailureProviderUnavailable RedeemFailureType = "provider.unavailable"
-	RedeemFailureProviderRejected    RedeemFailureType = "provider.rejected"
-	RedeemFailureProviderTimeout     RedeemFailureType = "provider.timeout"
+	RedeemFailureProviderUnavailable RedeemFailureCode = "provider.unavailable"
+	RedeemFailureProviderRejected    RedeemFailureCode = "provider.rejected"
+	RedeemFailureProviderTimeout     RedeemFailureCode = "provider.timeout"
 
-	RedeemFailureUnknown RedeemFailureType = "unknown"
+	RedeemFailureUnknown RedeemFailureCode = "unknown"
 )
 
 // RedeemFailure contains both normalized and provider diagnostic information.
 type RedeemFailure struct {
-	Type RedeemFailureType `json:"type"`
+	Code RedeemFailureCode `json:"code"`
 
-	// Detail contains optional occurrence-specific diagnostic information. It
-	// is not stable, is not localized, and must not be used for program logic
-	// or directly presented to end users.
-	Detail string `json:"detail,omitempty"`
+	Diagnostic
 
-	Violations []ConstraintResult `json:"violations,omitempty"`
+	Violations []ConstraintDecision `json:"violations,omitempty"`
 }
 
 // Redemption is an immutable record of one confirmed benefit consumption.

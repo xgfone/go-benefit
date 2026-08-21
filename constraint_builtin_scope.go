@@ -78,14 +78,10 @@ func (e scopeConstraintEvaluator) Evaluate(
 	satisfied := matchScope(values, allowed, params.Match)
 	return constraintDecision(
 		satisfied,
-		chooseMessage(
-			satisfied,
-			"operation is inside the allowed scope",
-			"operation is outside the allowed scope",
-		),
+		"operation is outside the allowed scope",
 		map[string]any{
-			"match":  params.Match,
-			"values": values,
+			"match":       params.Match,
+			"value_count": len(values),
 		},
 	), nil
 }

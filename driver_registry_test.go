@@ -369,6 +369,6 @@ func (fakeDriverCore) Redeem(context.Context, benefit.RedeemRequest) (benefit.Re
 func (fakeDriver) Reverse(context.Context, benefit.ReverseRequest) (benefit.ReverseResult, error) {
 	return benefit.ReverseResult{
 		Status:  benefit.ResultStatusFailure,
-		Failure: &benefit.ReversalFailure{Type: benefit.ReversalFailureReversalUnsupported},
+		Failure: &benefit.ReversalFailure{Code: benefit.ReversalFailureReversalUnsupported},
 	}, nil
 }

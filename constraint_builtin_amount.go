@@ -57,7 +57,7 @@ func (e amountConstraintEvaluator) Evaluate(
 	}
 
 	if !found {
-		return ConstraintResultUnsatisfied.Decision("operation amount is unavailable", nil), nil
+		return ConstraintDecisionUnsatisfied.Decision("operation amount is unavailable", nil), nil
 	}
 
 	if err := actual.Validate(); err != nil {
@@ -75,26 +75,18 @@ func (e amountConstraintEvaluator) Evaluate(
 		"currency":      params.Currency,
 	}
 	var satisfied bool
-	var message string
+	var reason string
 	if e.minimum {
 		satisfied = actual.Amount >= params.Amount
-		message = chooseMessage(
-			satisfied,
-			"operation amount meets the minimum",
-			"operation amount is below the minimum",
-		)
+		reason = "operation amount is below the minimum"
 		details["minimum_amount"] = params.Amount
 	} else {
 		satisfied = actual.Amount <= params.Amount
-		message = chooseMessage(
-			satisfied,
-			"operation amount meets the maximum",
-			"operation amount exceeds the maximum",
-		)
+		reason = "operation amount exceeds the maximum"
 		details["maximum_amount"] = params.Amount
 	}
 
-	return constraintDecision(satisfied, message, details), nil
+	return constraintDecision(satisfied, reason, details), nil
 }
 
 func decodeAmountConstraint(constraint Constraint) (AmountConstraintParams, *ConstraintDecision) {
@@ -123,7 +115,7 @@ func compareCurrency(actual, required string) *ConstraintDecision {
 	actualCurrency, actualOK := currency.Get(actual)
 	requiredCurrency, requiredOK := currency.Get(required)
 	if !actualOK || !requiredOK || actualCurrency.Code != requiredCurrency.Code {
-		decision := ConstraintResultUnsatisfied.Decision(
+		decision := ConstraintDecisionUnsatisfied.Decision(
 			"operation currency does not match the constraint currency",
 			map[string]any{
 				"actual_currency":   actual,

@@ -6,24 +6,21 @@ import (
 	"time"
 )
 
-// EvaluationFailureType identifies why an operation is not eligible.
-type EvaluationFailureType string
+// EvaluationFailureCode identifies why an operation is not eligible.
+type EvaluationFailureCode string
 
 const (
 	// EvaluationFailureBenefitInactive means the benefit is not currently
 	// in the active lifecycle state.
-	EvaluationFailureBenefitInactive       EvaluationFailureType = "benefit.inactive"
-	EvaluationFailureConstraintUnsatisfied EvaluationFailureType = "constraint.unsatisfied"
+	EvaluationFailureBenefitInactive       EvaluationFailureCode = "benefit.inactive"
+	EvaluationFailureConstraintUnsatisfied EvaluationFailureCode = "constraint.unsatisfied"
 )
 
 // EvaluationFailure describes a local or provider eligibility failure.
 type EvaluationFailure struct {
-	Type EvaluationFailureType `json:"type"`
+	Code EvaluationFailureCode `json:"code"`
 
-	// Detail contains optional occurrence-specific diagnostic information. It
-	// is not stable, is not localized, and must not be used for program logic
-	// or directly presented to end users.
-	Detail string `json:"detail,omitempty"`
+	Diagnostic
 }
 
 // EvaluationResult is the result of evaluating a benefit for one operation.
@@ -55,8 +52,10 @@ func EvaluateLocalEligibility(
 		return EvaluationResult{
 			Eligible: false,
 			Failure: &EvaluationFailure{
-				Type:   EvaluationFailureBenefitInactive,
-				Detail: fmt.Sprintf("benefit status is %q", input.Benefit.Status),
+				Code: EvaluationFailureBenefitInactive,
+				Diagnostic: Diagnostic{
+					Reason: fmt.Sprintf("benefit status is %q", input.Benefit.Status),
+				},
 			},
 			Constraints: ConstraintReport{Status: ConstraintReportStatusUnevaluated},
 		}, nil
@@ -66,8 +65,7 @@ func EvaluateLocalEligibility(
 	result := EvaluationResult{Eligible: report.IsSatisfied(), Constraints: report}
 	if !result.Eligible {
 		result.Failure = &EvaluationFailure{
-			Type:   EvaluationFailureConstraintUnsatisfied,
-			Detail: "one or more constraints are unsatisfied",
+			Code: EvaluationFailureConstraintUnsatisfied,
 		}
 	}
 	return result, nil

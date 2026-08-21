@@ -30,11 +30,7 @@ func evaluateRedemptionLimit(
 	satisfied := input.Benefit.Usage.RedeemedCount < params.MaxCount
 	return constraintDecision(
 		satisfied,
-		chooseMessage(
-			satisfied,
-			"redemption count is within the limit",
-			"redemption count would exceed the limit",
-		),
+		"redemption count would exceed the limit",
 		map[string]any{
 			"redeemed_count": input.Benefit.Usage.RedeemedCount,
 			"max_count":      params.MaxCount,

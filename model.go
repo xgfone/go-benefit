@@ -35,6 +35,8 @@ type Notice struct {
 	Code  NoticeCode  `json:"code"`
 	Level NoticeLevel `json:"level"`
 	Text  string      `json:"text"`
+	// Language is the BCP 47 language tag for Text.
+	Language string `json:"lang"`
 }
 
 // BenefitInfo is the normalized result of inspecting a benefit.
@@ -45,8 +47,8 @@ type BenefitInfo struct {
 
 	Usage       Usage             `json:"usage,omitzero"`
 	Validity    Validity          `json:"validity,omitzero"`
-	Constraints Constraints       `json:"constraints,omitempty"`
-	Operations  OperationSupports `json:"operations,omitempty"`
+	Constraints Constraints       `json:"-"`
+	Operations  OperationSupports `json:"-"`
 	Notices     []Notice          `json:"notices,omitempty"`
 
 	// ProviderBenefitID is an optional non-secret provider record identifier.

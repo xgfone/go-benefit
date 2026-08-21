@@ -6,33 +6,30 @@ import (
 	"time"
 )
 
-// ReversalFailureType is the stable business classification of a reversal failure.
-type ReversalFailureType string
+// ReversalFailureCode is the stable business classification of a reversal failure.
+type ReversalFailureCode string
 
 const (
-	ReversalFailureRedemptionNotFound     ReversalFailureType = "redemption.not_found"
-	ReversalFailureRedemptionReversed     ReversalFailureType = "redemption.reversed"
-	ReversalFailureRedemptionIrreversible ReversalFailureType = "redemption.irreversible"
+	ReversalFailureRedemptionNotFound     ReversalFailureCode = "redemption.not_found"
+	ReversalFailureRedemptionReversed     ReversalFailureCode = "redemption.reversed"
+	ReversalFailureRedemptionIrreversible ReversalFailureCode = "redemption.irreversible"
 
-	ReversalFailureReversalUnsupported        ReversalFailureType = "reversal.unsupported"
-	ReversalFailureReversalPartialUnsupported ReversalFailureType = "reversal.partial.unsupported"
-	ReversalFailureReversalWindowExpired      ReversalFailureType = "reversal.window_expired"
+	ReversalFailureReversalUnsupported        ReversalFailureCode = "reversal.unsupported"
+	ReversalFailureReversalPartialUnsupported ReversalFailureCode = "reversal.partial.unsupported"
+	ReversalFailureReversalWindowExpired      ReversalFailureCode = "reversal.window_expired"
 
-	ReversalFailureProviderUnavailable ReversalFailureType = "provider.unavailable"
-	ReversalFailureProviderRejected    ReversalFailureType = "provider.rejected"
-	ReversalFailureProviderTimeout     ReversalFailureType = "provider.timeout"
+	ReversalFailureProviderUnavailable ReversalFailureCode = "provider.unavailable"
+	ReversalFailureProviderRejected    ReversalFailureCode = "provider.rejected"
+	ReversalFailureProviderTimeout     ReversalFailureCode = "provider.timeout"
 
-	ReversalFailureUnknown ReversalFailureType = "unknown"
+	ReversalFailureUnknown ReversalFailureCode = "unknown"
 )
 
 // ReversalFailure contains normalized and provider diagnostic information.
 type ReversalFailure struct {
-	Type ReversalFailureType `json:"type"`
+	Code ReversalFailureCode `json:"code"`
 
-	// Detail contains optional occurrence-specific diagnostic information. It
-	// is not stable, is not localized, and must not be used for program logic
-	// or directly presented to end users.
-	Detail string `json:"detail,omitempty"`
+	Diagnostic
 }
 
 // Reversal is an immutable record of one confirmed reversal operation.

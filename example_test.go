@@ -242,7 +242,7 @@ func (d *exampleCouponDriver) Redeem(
 		return benefit.RedeemResult{
 			Status: benefit.ResultStatusFailure,
 			Failure: &benefit.RedeemFailure{
-				Type: benefit.RedeemFailureBenefitNotFound,
+				Code: benefit.RedeemFailureBenefitNotFound,
 			},
 		}, nil
 	}
@@ -258,8 +258,8 @@ func (d *exampleCouponDriver) Redeem(
 		return benefit.RedeemResult{
 			Status: benefit.ResultStatusFailure,
 			Failure: &benefit.RedeemFailure{
-				Type:       benefit.RedeemFailureConstraintUnsatisfied,
-				Violations: evaluation.Constraints.Violations(),
+				Code:       benefit.RedeemFailureConstraintUnsatisfied,
+				Violations: evaluation.Constraints.Violations,
 			},
 		}, nil
 	}

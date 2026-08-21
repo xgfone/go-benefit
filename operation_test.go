@@ -2,6 +2,8 @@ package benefit_test
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,7 +42,7 @@ func TestEffectiveOperationSupportsOnlyNarrowsCapabilities(t *testing.T) {
 		benefit.OperationSupport{
 			Operation: benefit.OperationReverse,
 			Supported: false,
-			Reason:    "this benefit is non-reversible",
+			Remark:    "this benefit is non-reversible",
 		},
 	}
 
@@ -53,7 +55,7 @@ func TestEffectiveOperationSupportsOnlyNarrowsCapabilities(t *testing.T) {
 		t.Fatalf("unexpected archive support: %#v", archive)
 	}
 	reverse, _ := effective.Get(benefit.OperationReverse)
-	if reverse.Supported || reverse.Reason == "" {
+	if reverse.Supported || reverse.Remark == "" {
 		t.Fatalf("unexpected reverse support: %#v", reverse)
 	}
 }
@@ -147,6 +149,110 @@ func TestEvaluateOperationRejectsCoreOperation(t *testing.T) {
 	}
 }
 
+func TestEvaluateOperationDecisionStatuses(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	input := benefit.EvaluationInput{Now: now}
+
+	unsupported, err := benefit.EvaluateOperation(
+		ctx,
+		benefit.DefaultConstraintRegistry,
+		nil,
+		benefit.OperationReverse,
+		input,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unsupported.Status != benefit.OperationDecisionStatusUnsupported ||
+		unsupported.IsSupported() || unsupported.IsEligible() ||
+		unsupported.Constraints.Status != benefit.ConstraintReportStatusUnevaluated ||
+		unsupported.Reason == "" {
+		t.Fatalf("unexpected unsupported decision: %#v", unsupported)
+	}
+	if err := unsupported.Validate(); err != nil {
+		t.Fatalf("unsupported decision failed validation: %v", err)
+	}
+
+	future, err := benefit.NewConstraint(
+		benefit.ConstraintTimeRange,
+		"operator-only operation constraint",
+		benefit.TimeRangeConstraintParams{StartsAt: now.Add(time.Hour)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supports := benefit.OperationSupports{{
+		Operation:   benefit.OperationReverse,
+		Supported:   true,
+		Constraints: benefit.Constraints{future},
+	}}
+	ineligible, err := benefit.EvaluateOperation(
+		ctx,
+		benefit.DefaultConstraintRegistry,
+		supports,
+		benefit.OperationReverse,
+		input,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ineligible.Status != benefit.OperationDecisionStatusIneligible ||
+		!ineligible.IsSupported() || ineligible.IsEligible() ||
+		ineligible.Constraints.Status != benefit.ConstraintReportStatusUnsatisfied ||
+		len(ineligible.Constraints.Violations) != 1 || ineligible.Reason == "" {
+		t.Fatalf("unexpected ineligible decision: %#v", ineligible)
+	}
+	if err := ineligible.Validate(); err != nil {
+		t.Fatalf("ineligible decision failed validation: %v", err)
+	}
+	data, err := json.Marshal(ineligible)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := string(data)
+	if !strings.Contains(encoded, `"status":"ineligible"`) ||
+		strings.Contains(encoded, "operator-only") || strings.Contains(encoded, `"params"`) ||
+		strings.Contains(encoded, `"remark"`) || strings.Contains(encoded, `"supported"`) ||
+		strings.Contains(encoded, `"eligible"`) {
+		t.Fatalf("operation definition leaked into decision JSON: %s", encoded)
+	}
+
+	supports[0].Constraints = nil
+	eligible, err := benefit.EvaluateOperation(
+		ctx,
+		benefit.DefaultConstraintRegistry,
+		supports,
+		benefit.OperationReverse,
+		input,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if eligible.Status != benefit.OperationDecisionStatusEligible ||
+		!eligible.IsSupported() || !eligible.IsEligible() ||
+		eligible.Constraints.Status != benefit.ConstraintReportStatusSatisfied ||
+		eligible.Reason != "" || eligible.Details != nil {
+		t.Fatalf("unexpected eligible decision: %#v", eligible)
+	}
+	if err := eligible.Validate(); err != nil {
+		t.Fatalf("eligible decision failed validation: %v", err)
+	}
+}
+
+func TestOperationDecisionRejectsInvalidStatusCombination(t *testing.T) {
+	decision := benefit.OperationDecision{
+		Operation: benefit.OperationReverse,
+		Status:    benefit.OperationDecisionStatusEligible,
+		Constraints: benefit.ConstraintReport{
+			Status: benefit.ConstraintReportStatusUnsatisfied,
+		},
+	}
+	if err := decision.Validate(); err == nil {
+		t.Fatal("eligible operation with unsatisfied constraints unexpectedly validated")
+	}
+}
+
 func TestEvaluateLocalEligibilityIncludesUnknownConstraints(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	known := mustConstraint(t, benefit.ConstraintTimeRange, benefit.TimeRangeConstraintParams{
@@ -167,7 +273,7 @@ func TestEvaluateLocalEligibilityIncludesUnknownConstraints(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result.Eligible || result.Failure == nil ||
-		result.Failure.Type != benefit.EvaluationFailureConstraintUnsatisfied {
+		result.Failure.Code != benefit.EvaluationFailureConstraintUnsatisfied {
 		t.Fatalf("unexpected eligibility result: %#v", result)
 	}
 	if result.Constraints.Status != benefit.ConstraintReportStatusUnsatisfied {
@@ -193,7 +299,7 @@ func TestEvaluateLocalEligibilityDoesNotEvaluateInactiveBenefitConstraints(t *te
 		result.Constraints.Status != benefit.ConstraintReportStatusUnevaluated {
 		t.Fatalf("unexpected inactive benefit result: %#v", result)
 	}
-	if result.Failure == nil || result.Failure.Type != benefit.EvaluationFailureBenefitInactive {
+	if result.Failure == nil || result.Failure.Code != benefit.EvaluationFailureBenefitInactive {
 		t.Fatalf("unexpected inactive benefit failure: %#v", result.Failure)
 	}
 }
@@ -210,7 +316,7 @@ func TestResultStatusValidation(t *testing.T) {
 	}
 	if err := (benefit.RedeemResult{
 		Status:  benefit.ResultStatusUnknown,
-		Failure: &benefit.RedeemFailure{Type: benefit.RedeemFailureProviderTimeout},
+		Failure: &benefit.RedeemFailure{Code: benefit.RedeemFailureProviderTimeout},
 	}).Validate(); err == nil {
 		t.Fatal("unknown redeem with confirmed failure unexpectedly validated")
 	}
@@ -225,7 +331,7 @@ func TestResultStatusValidation(t *testing.T) {
 	if err := (benefit.RedeemResult{
 		Status:     benefit.ResultStatusFailure,
 		Redemption: &benefit.Redemption{RedemptionID: "R1"},
-		Failure:    &benefit.RedeemFailure{Type: benefit.RedeemFailureProviderRejected},
+		Failure:    &benefit.RedeemFailure{Code: benefit.RedeemFailureProviderRejected},
 	}).Validate(); err == nil {
 		t.Fatal("failed redeem with redemption unexpectedly validated")
 	}

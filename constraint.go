@@ -31,14 +31,14 @@ type Constraint struct {
 	Type   ConstraintType  `json:"type"`
 	Params json.RawMessage `json:"params,omitempty"`
 
-	Description string `json:"description,omitempty"`
+	Remark string `json:"remark,omitempty"`
 }
 
 // Constraints is an ordered list of constraint definitions.
 type Constraints []Constraint
 
 // NewConstraint JSON-encodes params into a constraint definition.
-func NewConstraint(typ ConstraintType, description string, params any) (Constraint, error) {
+func NewConstraint(typ ConstraintType, remark string, params any) (Constraint, error) {
 	if typ == "" {
 		return Constraint{}, errors.New("benefit: constraint type is empty")
 	}
@@ -51,7 +51,7 @@ func NewConstraint(typ ConstraintType, description string, params any) (Constrai
 		}
 		raw = data
 	}
-	return Constraint{Type: typ, Description: description, Params: raw}, nil
+	return Constraint{Type: typ, Remark: remark, Params: raw}, nil
 }
 
 // DecodeParams decodes the constraint parameters into out.
@@ -68,81 +68,80 @@ func (c Constraint) DecodeParams(out any) error {
 	return nil
 }
 
-// ConstraintResultCode explains how a constraint result was produced.
-type ConstraintResultCode string
+// ConstraintDecisionCode explains how a constraint decision was produced.
+type ConstraintDecisionCode string
 
-func (c ConstraintResultCode) Decision(msg string, details map[string]any) ConstraintDecision {
+// Decision returns a constraint decision with diagnostic information. The
+// registry assigns the constraint type after evaluation.
+func (c ConstraintDecisionCode) Decision(reason string, details map[string]any) ConstraintDecision {
 	return ConstraintDecision{
-		Code:    c,
-		Message: msg,
-		Details: details,
+		Code: c,
+		Diagnostic: Diagnostic{
+			Reason:  reason,
+			Details: details,
+		},
 	}
 }
 
 const (
-	// ConstraintResultSatisfied means the constraint was recognized, evaluated,
+	// ConstraintDecisionSatisfied means the constraint was recognized, evaluated,
 	// and satisfied.
-	ConstraintResultSatisfied ConstraintResultCode = "satisfied"
+	ConstraintDecisionSatisfied ConstraintDecisionCode = "satisfied"
 
-	// ConstraintResultUnsatisfied means the constraint was recognized and
+	// ConstraintDecisionUnsatisfied means the constraint was recognized and
 	// evaluated, but its condition was not satisfied.
-	ConstraintResultUnsatisfied ConstraintResultCode = "unsatisfied"
+	ConstraintDecisionUnsatisfied ConstraintDecisionCode = "unsatisfied"
 
-	// ConstraintResultUnrecognized means no evaluator was registered for the
+	// ConstraintDecisionUnrecognized means no evaluator was registered for the
 	// constraint type.
-	ConstraintResultUnrecognized ConstraintResultCode = "unrecognized"
+	ConstraintDecisionUnrecognized ConstraintDecisionCode = "unrecognized"
 
-	// ConstraintResultInvalid means the constraint type was recognized, but its
+	// ConstraintDecisionInvalid means the constraint type was recognized, but its
 	// definition or parameters were invalid.
-	ConstraintResultInvalid ConstraintResultCode = "invalid"
+	ConstraintDecisionInvalid ConstraintDecisionCode = "invalid"
 
-	// ConstraintResultError means the registered evaluator could not complete
+	// ConstraintDecisionError means the registered evaluator could not complete
 	// the evaluation because of an execution error.
-	ConstraintResultError ConstraintResultCode = "error"
+	ConstraintDecisionError ConstraintDecisionCode = "error"
 )
 
 // ConstraintDecision is returned by a registered evaluator.
 type ConstraintDecision struct {
-	Code    ConstraintResultCode `json:"code"`
-	Message string               `json:"message,omitempty"`
-	Details map[string]any       `json:"details,omitempty"`
+	Type ConstraintType         `json:"type"`
+	Code ConstraintDecisionCode `json:"code"`
+
+	Diagnostic
 }
 
 // ConstraintSatisfied returns a successful evaluator decision.
-func ConstraintSatisfied(message string, details map[string]any) ConstraintDecision {
+func ConstraintSatisfied() ConstraintDecision {
 	return ConstraintDecision{
-		Code:    ConstraintResultSatisfied,
-		Message: message,
-		Details: details,
+		Code: ConstraintDecisionSatisfied,
 	}
 }
 
 // ConstraintUnsatisfied returns an unsuccessful evaluator decision.
-func ConstraintUnsatisfied(code ConstraintResultCode, message string, details map[string]any) ConstraintDecision {
-	if code == "" || code == ConstraintResultSatisfied {
-		code = ConstraintResultUnsatisfied
+func ConstraintUnsatisfied(code ConstraintDecisionCode, reason string, details map[string]any) ConstraintDecision {
+	if code == "" || code == ConstraintDecisionSatisfied {
+		code = ConstraintDecisionUnsatisfied
 	}
 	return ConstraintDecision{
-		Code:    code,
-		Message: message,
-		Details: details,
+		Code: code,
+		Diagnostic: Diagnostic{
+			Reason:  reason,
+			Details: details,
+		},
 	}
 }
 
 // IsSatisfied reports whether the constraint was satisfied.
 func (d ConstraintDecision) IsSatisfied() bool {
-	return d.Code == ConstraintResultSatisfied
+	return d.Code == ConstraintDecisionSatisfied
 }
 
 // IsRecognized reports whether the constraint type had a registered evaluator.
 func (d ConstraintDecision) IsRecognized() bool {
-	return d.Code != ConstraintResultUnrecognized
-}
-
-// ConstraintResult is the normalized result of one constraint evaluation.
-type ConstraintResult struct {
-	Constraint Constraint `json:"constraint"`
-	ConstraintDecision
+	return d.Code != ConstraintDecisionUnrecognized
 }
 
 // ConstraintReportStatus describes the aggregate constraint evaluation state.
@@ -162,11 +161,12 @@ const (
 	ConstraintReportStatusUnsatisfied ConstraintReportStatus = "unsatisfied"
 )
 
-// ConstraintReport aggregates all constraint results without short-circuiting.
+// ConstraintReport summarizes all constraint evaluations without
+// short-circuiting and includes only decisions that were not satisfied.
 type ConstraintReport struct {
 	Status       ConstraintReportStatus `json:"status"`
 	Unrecognized int                    `json:"unrecognized,omitempty"`
-	Results      []ConstraintResult     `json:"results,omitempty"`
+	Violations   []ConstraintDecision   `json:"violations,omitempty"`
 }
 
 // IsEvaluated reports whether constraint evaluation ran.
@@ -178,17 +178,6 @@ func (r ConstraintReport) IsEvaluated() bool {
 // IsSatisfied reports whether evaluation ran and every constraint was satisfied.
 func (r ConstraintReport) IsSatisfied() bool {
 	return r.Status == ConstraintReportStatusSatisfied
-}
-
-// Violations returns all unsatisfied constraint results.
-func (r ConstraintReport) Violations() []ConstraintResult {
-	var violations []ConstraintResult
-	for _, result := range r.Results {
-		if !result.IsSatisfied() {
-			violations = append(violations, result)
-		}
-	}
-	return violations
 }
 
 // ConstraintEvaluator evaluates one constraint against in-process input. It
@@ -300,42 +289,56 @@ func (r *ConstraintRegistry) Evaluate(
 	ctx context.Context,
 	constraint Constraint,
 	input EvaluationInput,
-) ConstraintResult {
+) ConstraintDecision {
 	evaluator, recognized := r.Get(constraint.Type)
 	if !recognized {
-		message := fmt.Sprintf("constraint type %q is not registered", constraint.Type)
-		decision := ConstraintUnsatisfied(ConstraintResultUnrecognized, message, nil)
-		return ConstraintResult{Constraint: constraint, ConstraintDecision: decision}
+		reason := fmt.Sprintf("constraint type %q is not registered", constraint.Type)
+		decision := ConstraintUnsatisfied(ConstraintDecisionUnrecognized, reason, nil)
+		decision.Type = constraint.Type
+		return decision
 	}
 
 	decision, err := evaluator.Evaluate(ctx, constraint, input)
 	if err != nil {
-		decision := ConstraintUnsatisfied(ConstraintResultError, err.Error(), nil)
-		return ConstraintResult{Constraint: constraint, ConstraintDecision: decision}
+		decision := ConstraintUnsatisfied(ConstraintDecisionError, "constraint evaluator failed", nil)
+		decision.Type = constraint.Type
+		return decision
 	}
 
 	code := decision.Code
-	if message := invalidDecisionCodeMessage(code); message != "" {
-		decision := ConstraintUnsatisfied(ConstraintResultError, message, nil)
-		return ConstraintResult{Constraint: constraint, ConstraintDecision: decision}
+	if reason := invalidDecisionCodeReason(code); reason != "" {
+		decision := ConstraintUnsatisfied(ConstraintDecisionError, reason, nil)
+		decision.Type = constraint.Type
+		return decision
 	}
 
-	return ConstraintResult{Constraint: constraint, ConstraintDecision: decision}
+	decision.Type = constraint.Type
+	if decision.IsSatisfied() {
+		decision.Diagnostic = Diagnostic{}
+	} else if decision.Reason == "" {
+		decision = ConstraintUnsatisfied(
+			ConstraintDecisionError,
+			"constraint evaluator returned a negative decision without a reason",
+			nil,
+		)
+		decision.Type = constraint.Type
+	}
+	return decision
 }
 
-func invalidDecisionCodeMessage(code ConstraintResultCode) string {
+func invalidDecisionCodeReason(code ConstraintDecisionCode) string {
 	switch code {
 	case
-		ConstraintResultSatisfied,
-		ConstraintResultUnsatisfied,
-		ConstraintResultInvalid,
-		ConstraintResultError:
+		ConstraintDecisionSatisfied,
+		ConstraintDecisionUnsatisfied,
+		ConstraintDecisionInvalid,
+		ConstraintDecisionError:
 		return ""
 
 	case "":
 		return "constraint evaluator returned an empty result code"
 
-	case ConstraintResultUnrecognized:
+	case ConstraintDecisionUnrecognized:
 		return "registered constraint evaluator returned the reserved unrecognized result code"
 
 	default:
@@ -350,17 +353,16 @@ func (r *ConstraintRegistry) EvaluateAll(
 	constraints Constraints,
 ) ConstraintReport {
 	report := ConstraintReport{
-		Status:  ConstraintReportStatusSatisfied,
-		Results: make([]ConstraintResult, 0, len(constraints)),
+		Status: ConstraintReportStatusSatisfied,
 	}
 
 	for _, constraint := range constraints {
-		result := r.Evaluate(ctx, constraint, input)
-		report.Results = append(report.Results, result)
-		if !result.IsSatisfied() {
+		decision := r.Evaluate(ctx, constraint, input)
+		if !decision.IsSatisfied() {
 			report.Status = ConstraintReportStatusUnsatisfied
+			report.Violations = append(report.Violations, decision)
 		}
-		if !result.IsRecognized() {
+		if !decision.IsRecognized() {
 			report.Unrecognized++
 		}
 	}

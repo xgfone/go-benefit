@@ -38,6 +38,25 @@ func (u Usage) Validate() error {
 	return nil
 }
 
+// Validate verifies that a notice has display text and its language.
+func (n Notice) Validate() error {
+	if n.Code == "" {
+		return errors.New("benefit: notice code is empty")
+	}
+	switch n.Level {
+	case NoticeInfo, NoticeWarning, NoticeError:
+	default:
+		return fmt.Errorf("benefit: invalid notice level %q", n.Level)
+	}
+	if n.Text == "" {
+		return errors.New("benefit: notice text is empty")
+	}
+	if n.Language == "" {
+		return errors.New("benefit: notice language is empty")
+	}
+	return nil
+}
+
 // Validate verifies a benefit inspection result.
 func (b BenefitInfo) Validate() error {
 	if err := b.DriverType.Validate(); err != nil {
@@ -54,6 +73,11 @@ func (b BenefitInfo) Validate() error {
 	}
 	if err := b.Operations.Validate(); err != nil {
 		return err
+	}
+	for _, notice := range b.Notices {
+		if err := notice.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

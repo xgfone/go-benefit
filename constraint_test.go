@@ -20,26 +20,27 @@ func TestUnknownConstraintIsUnsatisfied(t *testing.T) {
 	if !report.IsEvaluated() {
 		t.Fatal("unknown constraint report was not marked as evaluated")
 	}
-	if report.Unrecognized != 1 || len(report.Results) != 1 {
+	if report.Unrecognized != 1 || len(report.Violations) != 1 {
 		t.Fatalf("unexpected report: %#v", report)
 	}
-	result := report.Results[0]
-	if result.IsRecognized() || result.IsSatisfied() || result.Code != benefit.ConstraintResultUnrecognized {
-		t.Fatalf("unexpected unknown result: %#v", result)
+	decision := report.Violations[0]
+	if decision.Type != constraint.Type || decision.IsRecognized() || decision.IsSatisfied() ||
+		decision.Code != benefit.ConstraintDecisionUnrecognized {
+		t.Fatalf("unexpected unknown decision: %#v", decision)
 	}
 }
 
 func TestUnregisteredConstraintTypeIsUnrecognized(t *testing.T) {
 	constraint := benefit.Constraint{Type: "not_namespaced"}
-	result := benefit.NewConstraintRegistry().Evaluate(
+	decision := benefit.NewConstraintRegistry().Evaluate(
 		context.Background(),
 		constraint,
 		benefit.EvaluationInput{},
 	)
 
-	if result.IsSatisfied() || result.IsRecognized() ||
-		result.Code != benefit.ConstraintResultUnrecognized {
-		t.Fatalf("unexpected unregistered constraint result: %#v", result)
+	if decision.Type != constraint.Type || decision.IsSatisfied() || decision.IsRecognized() ||
+		decision.Code != benefit.ConstraintDecisionUnrecognized {
+		t.Fatalf("unexpected unregistered constraint decision: %#v", decision)
 	}
 	if err := benefit.NewConstraintRegistry().Register(
 		constraint.Type,
@@ -48,7 +49,7 @@ func TestUnregisteredConstraintTypeIsUnrecognized(t *testing.T) {
 			benefit.Constraint,
 			benefit.EvaluationInput,
 		) (benefit.ConstraintDecision, error) {
-			return benefit.ConstraintSatisfied("satisfied", nil), nil
+			return benefit.ConstraintSatisfied(), nil
 		}),
 	); err == nil {
 		t.Fatal("constraint type without a namespace unexpectedly registered")
@@ -92,7 +93,19 @@ func TestExtractedAmountAndScopeConstraints(t *testing.T) {
 		benefit.Constraints{minimum, products},
 	)
 	if !report.IsSatisfied() {
-		t.Fatalf("constraints unexpectedly failed: %#v", report.Violations())
+		t.Fatalf("constraints unexpectedly failed: %#v", report.Violations)
+	}
+
+	input.Context = testOperationContext{Products: []string{"SENSITIVE-PRODUCT"}}
+	report = registry.EvaluateAll(context.Background(), input, benefit.Constraints{products})
+	if report.IsSatisfied() || len(report.Violations) != 1 {
+		t.Fatalf("out-of-scope product unexpectedly satisfied: %#v", report)
+	}
+	if _, leaked := report.Violations[0].Details["values"]; leaked {
+		t.Fatalf("scope values leaked into decision details: %#v", report.Violations[0])
+	}
+	if count, ok := report.Violations[0].Details["value_count"].(int); !ok || count != 1 {
+		t.Fatalf("unexpected safe scope details: %#v", report.Violations[0].Details)
 	}
 }
 
@@ -113,9 +126,9 @@ func TestAmountConstraintRejectsCurrencyMismatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := registry.Evaluate(context.Background(), minimum, input)
-	if result.IsSatisfied() || result.Code != benefit.ConstraintResultUnsatisfied {
-		t.Fatalf("unexpected currency result: %#v", result)
+	decision := registry.Evaluate(context.Background(), minimum, input)
+	if decision.IsSatisfied() || decision.Code != benefit.ConstraintDecisionUnsatisfied {
+		t.Fatalf("unexpected currency decision: %#v", decision)
 	}
 }
 
@@ -148,12 +161,12 @@ func TestTimeWeekdayAndRedemptionLimitConstraints(t *testing.T) {
 		benefit.Constraints{timeRange, weekday, limit},
 	)
 	if !report.IsSatisfied() {
-		t.Fatalf("constraints unexpectedly failed: %#v", report.Violations())
+		t.Fatalf("constraints unexpectedly failed: %#v", report.Violations)
 	}
 
 	input.Benefit.Usage.RedeemedCount = 5
 	report = benefit.EvaluateConstraints(context.Background(), input, benefit.Constraints{limit})
-	if report.IsSatisfied() || len(report.Violations()) != 1 {
+	if report.IsSatisfied() || len(report.Violations) != 1 {
 		t.Fatalf("limit unexpectedly satisfied: %#v", report)
 	}
 }
@@ -197,9 +210,12 @@ func TestConstraintRegistryEvaluatorError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := registry.Evaluate(context.Background(), benefit.Constraint{Type: "test.broken"}, benefit.EvaluationInput{})
-	if result.IsSatisfied() || !result.IsRecognized() || result.Code != benefit.ConstraintResultError {
-		t.Fatalf("unexpected evaluator error result: %#v", result)
+	decision := registry.Evaluate(context.Background(), benefit.Constraint{Type: "test.broken"}, benefit.EvaluationInput{})
+	if decision.IsSatisfied() || !decision.IsRecognized() || decision.Code != benefit.ConstraintDecisionError {
+		t.Fatalf("unexpected evaluator error decision: %#v", decision)
+	}
+	if decision.Reason != "constraint evaluator failed" || decision.Details != nil {
+		t.Fatalf("unsafe evaluator diagnostic was returned: %#v", decision)
 	}
 	if err := registry.Register("test.broken", benefit.ConstraintEvaluatorFunc(nil)); err == nil {
 		t.Fatal("duplicate constraint registration unexpectedly succeeded")
@@ -213,19 +229,45 @@ func TestConstraintRegistryValidatesDecisionCode(t *testing.T) {
 		benefit.Constraint,
 		benefit.EvaluationInput,
 	) (benefit.ConstraintDecision, error) {
-		return benefit.ConstraintSatisfied("eligible", nil), nil
+		return benefit.ConstraintDecision{
+			Code: benefit.ConstraintDecisionSatisfied,
+			Diagnostic: benefit.Diagnostic{
+				Reason:  "must be discarded",
+				Details: map[string]any{"secret": "must be discarded"},
+			},
+		}, nil
 	})); err != nil {
 		t.Fatal(err)
 	}
 
 	success := registry.Evaluate(context.Background(), benefit.Constraint{Type: "test.success"}, benefit.EvaluationInput{})
-	if !success.IsSatisfied() || success.Code != benefit.ConstraintResultSatisfied {
+	if !success.IsSatisfied() || success.Type != "test.success" ||
+		success.Code != benefit.ConstraintDecisionSatisfied ||
+		success.Reason != "" || success.Details != nil {
 		t.Fatalf("successful decision was not preserved: %#v", success)
 	}
 
-	invalidCodes := []benefit.ConstraintResultCode{
+	if err := registry.Register("test.missing_reason", benefit.ConstraintEvaluatorFunc(func(
+		context.Context,
+		benefit.Constraint,
+		benefit.EvaluationInput,
+	) (benefit.ConstraintDecision, error) {
+		return benefit.ConstraintDecision{Code: benefit.ConstraintDecisionUnsatisfied}, nil
+	})); err != nil {
+		t.Fatal(err)
+	}
+	missingReason := registry.Evaluate(
+		context.Background(),
+		benefit.Constraint{Type: "test.missing_reason"},
+		benefit.EvaluationInput{},
+	)
+	if missingReason.Code != benefit.ConstraintDecisionError || missingReason.Reason == "" {
+		t.Fatalf("negative decision without a reason was not rejected: %#v", missingReason)
+	}
+
+	invalidCodes := []benefit.ConstraintDecisionCode{
 		"",
-		benefit.ConstraintResultUnrecognized,
+		benefit.ConstraintDecisionUnrecognized,
 		"custom",
 	}
 	for i, code := range invalidCodes {
@@ -240,9 +282,9 @@ func TestConstraintRegistryValidatesDecisionCode(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		result := registry.Evaluate(context.Background(), benefit.Constraint{Type: typ}, benefit.EvaluationInput{})
-		if result.IsSatisfied() || result.Code != benefit.ConstraintResultError {
-			t.Fatalf("invalid decision code %q was not rejected: %#v", code, result)
+		decision := registry.Evaluate(context.Background(), benefit.Constraint{Type: typ}, benefit.EvaluationInput{})
+		if decision.IsSatisfied() || decision.Code != benefit.ConstraintDecisionError {
+			t.Fatalf("invalid decision code %q was not rejected: %#v", code, decision)
 		}
 	}
 }

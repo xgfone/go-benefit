@@ -128,17 +128,22 @@ func TestRequestJSONOmitsInProcessValues(t *testing.T) {
 	}
 }
 
-func TestConstraintsAndOperationsMarshalAsLists(t *testing.T) {
+func TestBenefitInfoDoesNotMarshalConstraintOrOperationDefinitions(t *testing.T) {
 	value := benefit.BenefitInfo{
 		Status:     benefit.StatusActive,
 		DriverType: "test.coupon",
 		Constraints: benefit.Constraints{
-			benefit.Constraint{Type: "test.provider_rule"},
+			benefit.Constraint{
+				Type:   "test.provider_rule",
+				Params: json.RawMessage(`{"secret":"constraint-secret"}`),
+				Remark: "operator-only constraint remark",
+			},
 		},
 		Operations: benefit.OperationSupports{
 			benefit.OperationSupport{
 				Operation: benefit.OperationReverse,
 				Supported: true,
+				Remark:    "operator-only operation remark",
 			},
 		},
 	}
@@ -147,52 +152,57 @@ func TestConstraintsAndOperationsMarshalAsLists(t *testing.T) {
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if !strings.Contains(encoded, `"constraints":[`) || !strings.Contains(encoded, `"operations":[`) {
-		t.Fatalf("constraints or operations were not encoded as lists: %s", encoded)
+	if strings.Contains(encoded, `"constraints"`) || strings.Contains(encoded, `"operations"`) ||
+		strings.Contains(encoded, "constraint-secret") || strings.Contains(encoded, "operator-only") {
+		t.Fatalf("constraint or operation definition leaked into benefit JSON: %s", encoded)
 	}
 }
 
-func TestConstraintResultEmbeddingKeepsFlatJSON(t *testing.T) {
-	result := benefit.ConstraintResult{
-		Constraint: benefit.Constraint{Type: "test.example"},
-		ConstraintDecision: benefit.ConstraintSatisfied(
-			"constraint is satisfied",
-			map[string]any{"source": "test"},
-		),
+func TestConstraintDecisionJSONContainsOnlyDecisionData(t *testing.T) {
+	decision := benefit.ConstraintDecision{
+		Type: "test.example",
+		Code: benefit.ConstraintDecisionUnsatisfied,
+		Diagnostic: benefit.Diagnostic{
+			Reason:  "test constraint was not satisfied",
+			Details: map[string]any{"source": "test"},
+		},
 	}
 
-	data, err := json.Marshal(result)
+	data, err := json.Marshal(decision)
 	if err != nil {
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if !strings.Contains(encoded, `"code":"satisfied"`) ||
-		strings.Contains(encoded, `"ConstraintDecision"`) {
-		t.Fatalf("constraint decision was not flattened: %s", encoded)
+	if !strings.Contains(encoded, `"type":"test.example"`) ||
+		!strings.Contains(encoded, `"code":"unsatisfied"`) ||
+		!strings.Contains(encoded, `"reason":"test constraint was not satisfied"`) ||
+		strings.Contains(encoded, `"constraint"`) || strings.Contains(encoded, `"params"`) ||
+		strings.Contains(encoded, `"remark"`) {
+		t.Fatalf("unexpected constraint decision JSON: %s", encoded)
 	}
 
-	var decoded benefit.ConstraintResult
+	var decoded benefit.ConstraintDecision
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if !decoded.IsSatisfied() || decoded.Message != result.Message {
-		t.Fatalf("unexpected decoded result: %#v", decoded)
+	if decoded.IsSatisfied() || decoded.Reason != decision.Reason || decoded.Type != decision.Type {
+		t.Fatalf("unexpected decoded decision: %#v", decoded)
 	}
 }
 
-func TestFailureDetailJSON(t *testing.T) {
+func TestFailureDiagnosticJSON(t *testing.T) {
 	values := []any{
 		benefit.EvaluationFailure{
-			Type:   benefit.EvaluationFailureBenefitInactive,
-			Detail: "benefit status is expired",
+			Code:       benefit.EvaluationFailureBenefitInactive,
+			Diagnostic: benefit.Diagnostic{Reason: "benefit status is expired"},
 		},
 		benefit.RedeemFailure{
-			Type:   benefit.RedeemFailureProviderRejected,
-			Detail: "provider rejection code 42",
+			Code:       benefit.RedeemFailureProviderRejected,
+			Diagnostic: benefit.Diagnostic{Reason: "provider rejection code 42"},
 		},
 		benefit.ReversalFailure{
-			Type:   benefit.ReversalFailureReversalWindowExpired,
-			Detail: "reversal deadline was 2026-08-20T18:00:00+08:00",
+			Code:       benefit.ReversalFailureReversalWindowExpired,
+			Diagnostic: benefit.Diagnostic{Reason: "reversal deadline was 2026-08-20T18:00:00+08:00"},
 		},
 	}
 
@@ -202,7 +212,9 @@ func TestFailureDetailJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 		encoded := string(data)
-		if !strings.Contains(encoded, `"detail":`) || strings.Contains(encoded, `"message":`) {
+		if !strings.Contains(encoded, `"code":`) || !strings.Contains(encoded, `"reason":`) ||
+			strings.Contains(encoded, `"type":`) || strings.Contains(encoded, `"detail":`) ||
+			strings.Contains(encoded, `"message":`) {
 			t.Fatalf("unexpected failure JSON: %s", encoded)
 		}
 	}
@@ -224,13 +236,36 @@ func TestBenefitInfoDoesNotValidateNoticeCodeFormat(t *testing.T) {
 		Status:     benefit.StatusActive,
 		DriverType: "test.coupon",
 		Notices: []benefit.Notice{{
-			Code:  "ProviderWarning",
-			Level: benefit.NoticeWarning,
-			Text:  "Provider-specific warning",
+			Code:     "ProviderWarning",
+			Level:    benefit.NoticeWarning,
+			Text:     "Provider-specific warning",
+			Language: "en-US",
 		}},
 	}
 	if err := info.Validate(); err != nil {
 		t.Fatalf("notice code format was unexpectedly validated: %v", err)
+	}
+	data, err := json.Marshal(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"lang":"en-US"`) {
+		t.Fatalf("notice language was not encoded: %s", data)
+	}
+}
+
+func TestBenefitInfoRequiresNoticeLanguage(t *testing.T) {
+	info := benefit.BenefitInfo{
+		Status:     benefit.StatusActive,
+		DriverType: "test.coupon",
+		Notices: []benefit.Notice{{
+			Code:  "test.notice",
+			Level: benefit.NoticeInfo,
+			Text:  "Localized notice",
+		}},
+	}
+	if err := info.Validate(); err == nil {
+		t.Fatal("notice without a language unexpectedly validated")
 	}
 }
 

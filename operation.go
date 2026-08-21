@@ -38,7 +38,7 @@ type OperationSupport struct {
 	Supported   bool            `json:"supported"`
 	Operation   Operation       `json:"operation"`
 	Constraints Constraints     `json:"constraints,omitempty"`
-	Reason      string          `json:"reason,omitempty"`
+	Remark      string          `json:"remark,omitempty"`
 	Modes       []OperationMode `json:"modes,omitempty"`
 }
 
@@ -152,7 +152,7 @@ func EffectiveOperationSupports(declared OperationSupports, restrictions ...Oper
 			if !restriction.Supported {
 				current.Supported = false
 				current.Modes = nil
-				current.Reason = restriction.Reason
+				current.Remark = restriction.Remark
 				current.Constraints = append(current.Constraints, restriction.Constraints...)
 				continue
 			}
@@ -166,14 +166,13 @@ func EffectiveOperationSupports(declared OperationSupports, restrictions ...Oper
 					current.Modes = intersectModes(current.Modes, restriction.Modes)
 					if len(current.Modes) == 0 {
 						current.Supported = false
-						current.Reason = "no operation mode remains after applying restrictions"
 					}
 				}
 			}
 
 			current.Constraints = append(current.Constraints, restriction.Constraints...)
-			if restriction.Reason != "" {
-				current.Reason = restriction.Reason
+			if restriction.Remark != "" {
+				current.Remark = restriction.Remark
 			}
 		}
 	}
@@ -221,14 +220,91 @@ func containsOperationMode(modes []OperationMode, target OperationMode) bool {
 	})
 }
 
-// OperationEvaluation combines optional operation support with its constraint
+// OperationDecisionStatus is the mutually exclusive result of evaluating an
+// optional operation.
+type OperationDecisionStatus string
+
+const (
+	// OperationDecisionStatusUnsupported means the driver or benefit does not
+	// support the operation, so its constraints were not evaluated.
+	OperationDecisionStatusUnsupported OperationDecisionStatus = "unsupported"
+
+	// OperationDecisionStatusIneligible means the operation is supported, but
+	// at least one operation-specific constraint was not satisfied.
+	OperationDecisionStatusIneligible OperationDecisionStatus = "ineligible"
+
+	// OperationDecisionStatusEligible means the operation is supported and all
+	// operation-specific constraints were satisfied.
+	OperationDecisionStatusEligible OperationDecisionStatus = "eligible"
+)
+
+// Validate verifies an operation decision status.
+func (s OperationDecisionStatus) Validate() error {
+	switch s {
+	case
+		OperationDecisionStatusUnsupported,
+		OperationDecisionStatusIneligible,
+		OperationDecisionStatusEligible:
+		return nil
+
+	default:
+		return fmt.Errorf("benefit: invalid operation decision status %q", s)
+	}
+}
+
+// OperationDecision combines optional operation support with its constraint
 // report.
-type OperationEvaluation struct {
-	Operation   Operation        `json:"operation"`
-	Supported   bool             `json:"supported"`
-	Eligible    bool             `json:"eligible"`
-	Reason      string           `json:"reason,omitempty"`
+type OperationDecision struct {
+	Operation Operation               `json:"operation"`
+	Status    OperationDecisionStatus `json:"status"`
+
+	Diagnostic
+
 	Constraints ConstraintReport `json:"constraints"`
+}
+
+// IsSupported reports whether the operation capability is available.
+func (d OperationDecision) IsSupported() bool {
+	return d.Status == OperationDecisionStatusIneligible ||
+		d.Status == OperationDecisionStatusEligible
+}
+
+// IsEligible reports whether the operation is supported and all of its
+// constraints were satisfied.
+func (d OperationDecision) IsEligible() bool {
+	return d.Status == OperationDecisionStatusEligible
+}
+
+// Validate verifies the relationship between the operation status, diagnostic,
+// and constraint report.
+func (d OperationDecision) Validate() error {
+	if d.Operation == "" {
+		return errors.New("benefit: operation decision operation is empty")
+	}
+	if err := d.Status.Validate(); err != nil {
+		return err
+	}
+
+	switch d.Status {
+	case OperationDecisionStatusUnsupported:
+		if d.Constraints.Status != ConstraintReportStatusUnevaluated {
+			return errors.New("benefit: unsupported operation has evaluated constraints")
+		}
+
+	case OperationDecisionStatusIneligible:
+		if d.Constraints.Status != ConstraintReportStatusUnsatisfied {
+			return errors.New("benefit: ineligible operation has no unsatisfied constraints")
+		}
+
+	case OperationDecisionStatusEligible:
+		if d.Constraints.Status != ConstraintReportStatusSatisfied {
+			return errors.New("benefit: eligible operation has unsatisfied constraints")
+		}
+		if d.Reason != "" || len(d.Details) > 0 {
+			return errors.New("benefit: eligible operation has diagnostic information")
+		}
+	}
+	return nil
 }
 
 // EvaluateOperation checks one optional capability and evaluates its
@@ -239,40 +315,37 @@ func EvaluateOperation(
 	supports OperationSupports,
 	operation Operation,
 	input EvaluationInput,
-) (OperationEvaluation, error) {
+) (OperationDecision, error) {
 	if isCoreOperation(operation) {
 		const msg = "benefit: core operation %q does not require capability evaluation"
-		return OperationEvaluation{}, fmt.Errorf(msg, operation)
+		return OperationDecision{}, fmt.Errorf(msg, operation)
 	}
 	if registry == nil {
-		return OperationEvaluation{}, errors.New("benefit: constraint registry is nil")
+		return OperationDecision{}, errors.New("benefit: constraint registry is nil")
 	}
 	if err := supports.Validate(); err != nil {
-		return OperationEvaluation{}, err
+		return OperationDecision{}, err
 	}
 
 	support, ok := supports.Get(operation)
 	if !ok || !support.Supported {
-		reason := "operation is not supported"
-		if ok && support.Reason != "" {
-			reason = support.Reason
-		}
-
-		return OperationEvaluation{
+		return OperationDecision{
 			Operation:   operation,
-			Supported:   false,
-			Eligible:    false,
-			Reason:      reason,
+			Status:      OperationDecisionStatusUnsupported,
+			Diagnostic:  Diagnostic{Reason: "operation is not supported"},
 			Constraints: ConstraintReport{Status: ConstraintReportStatusUnevaluated},
 		}, nil
 	}
 
 	report := registry.EvaluateAll(ctx, input, support.Constraints)
-	return OperationEvaluation{
+	decision := OperationDecision{
 		Operation:   operation,
-		Supported:   true,
-		Eligible:    report.IsSatisfied(),
-		Reason:      support.Reason,
+		Status:      OperationDecisionStatusEligible,
 		Constraints: report,
-	}, nil
+	}
+	if !report.IsSatisfied() {
+		decision.Status = OperationDecisionStatusIneligible
+		decision.Reason = "operation constraints are unsatisfied"
+	}
+	return decision, nil
 }
