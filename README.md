@@ -81,6 +81,11 @@ is supported only when its declared modes contain `partial`; an empty mode list
 therefore means full-only. A driver that declares Reverse must implement
 `Reverser`.
 
+`OperationSupport` is an internal capability definition. `EvaluateOperation`
+returns an `OperationDecision` whose mutually exclusive status is `unsupported`,
+`ineligible`, or `eligible`; raw operation constraints and operator remarks are
+not part of that decision.
+
 ## Constraints
 
 Constraints and operation capabilities are ordered lists. A concurrency-safe
@@ -89,10 +94,18 @@ Registration validates the type name; evaluation does not reject malformed
 input names separately because any unregistered type is already
 `unrecognized`.
 
-All constraints are evaluated so callers receive a complete report. An unknown,
+All constraints are evaluated so callers receive every violation. An unknown,
 invalid, errored, or normally unsatisfied constraint makes the aggregate report
 unsatisfied. `ConstraintReport.Status` distinguishes `unevaluated`, `satisfied`,
-and `unsatisfied`; an evaluated empty list is satisfied.
+and `unsatisfied`; an evaluated empty list is satisfied. A satisfied report has
+no decisions, while an unsatisfied report contains only its `Violations`.
+
+Constraint definitions contain evaluator parameters and an optional operator
+remark. They are available in-process and to explicit management mappings, but
+are excluded from `BenefitInfo` JSON. A `ConstraintDecision` contains only the
+constraint type, its decision code, and optional safe diagnostic information;
+it never embeds the original definition. Human-facing constraint information
+belongs in `Notice` instead.
 
 Drivers should model fixed filters compiled from `DriverConfig` and per-call
 facts extracted from `OperationContext` with the same constraint mechanism. A
@@ -122,12 +135,13 @@ reported as confirmed failures when the remote operation may have completed.
 Go errors are reserved for local invocation or integration failures that do not
 express a confirmed provider business result.
 
-Failure `Type` values are stable machine identifiers for program logic and
-client localization. `Detail` is optional occurrence-specific diagnostic text;
-it is not stable or localized and must not drive logic or be shown directly to
-end users. Notice codes follow the same stable-localization principle, while
-notice text is user- or operator-facing information rather than a machine
-capability.
+Failure `Code` values are stable machine identifiers for program logic and
+client localization. `Diagnostic.Reason` and `Diagnostic.Details` contain
+optional occurrence-specific troubleshooting information; they are not stable
+or localized, must not drive logic, and must not be shown directly to end
+users. Diagnostic details must contain only non-sensitive data. Notice codes
+follow the same stable-localization principle, while notice text is user- or
+operator-facing information and carries its BCP 47 language tag in `lang`.
 
 Callers assign a unique `RedemptionID` or `ReversalID` before each mutation and
 reuse the same ID when retrying an uncertain operation. Drivers and hosts are
