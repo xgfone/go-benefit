@@ -49,9 +49,9 @@ type OperationCapabilities []OperationCapability
 //
 // A policy must either set Disabled or provide Constraints, but not both.
 type OperationPolicy struct {
+	Disabled    bool            `json:"disabled,omitempty"`
 	Operation   Operation       `json:"operation"`
 	MatchModes  []OperationMode `json:"match_modes,omitempty"`
-	Disabled    bool            `json:"disabled,omitempty"`
 	Constraints Constraints     `json:"constraints,omitempty"`
 	Remark      string          `json:"remark,omitempty"`
 }
@@ -224,8 +224,7 @@ type OperationDecision struct {
 // IsSupported reports whether the operation capability exists and is not
 // permanently disabled for this benefit.
 func (d OperationDecision) IsSupported() bool {
-	return d.Status == OperationDecisionStatusIneligible ||
-		d.Status == OperationDecisionStatusEligible
+	return d.Status != OperationDecisionStatusUnsupported
 }
 
 // IsEligible reports whether the operation is supported and all of its
@@ -304,7 +303,7 @@ func EvaluateOperation(
 		return unsupportedOperationDecision(operation, mode, "operation mode is not supported"), nil
 	}
 
-	constraints := make(Constraints, 0)
+	var constraints Constraints
 	for _, policy := range policies {
 		if !policyMatches(policy, operation, mode) {
 			continue
@@ -336,18 +335,14 @@ func validateOperationPoliciesAgainstCapabilities(
 	for _, policy := range policies {
 		capability, ok := capabilities.Get(policy.Operation)
 		if !ok {
-			return fmt.Errorf(
-				"benefit: operation policy targets unsupported operation %q",
-				policy.Operation,
-			)
+			const msg = "benefit: operation policy targets unsupported operation %q"
+			return fmt.Errorf(msg, policy.Operation)
 		}
+
 		for _, mode := range policy.MatchModes {
 			if !capability.SupportsMode(mode) {
-				return fmt.Errorf(
-					"benefit: operation %q policy targets unsupported mode %q",
-					policy.Operation,
-					mode,
-				)
+				const msg = "benefit: operation %q policy targets unsupported mode %q"
+				return fmt.Errorf(msg, policy.Operation, mode)
 			}
 		}
 	}
