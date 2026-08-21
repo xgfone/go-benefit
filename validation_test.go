@@ -236,10 +236,10 @@ func TestBenefitInfoDoesNotValidateNoticeCodeFormat(t *testing.T) {
 		Status:     benefit.StatusActive,
 		DriverType: "test.coupon",
 		Notices: []benefit.Notice{{
-			Code:     "ProviderWarning",
-			Level:    benefit.NoticeWarning,
-			Text:     "Provider-specific warning",
-			Language: "en-US",
+			Code:  "ProviderWarning",
+			Level: benefit.NoticeWarning,
+			Text:  "Provider-specific warning",
+			Lang:  "en-US",
 		}},
 	}
 	if err := info.Validate(); err != nil {

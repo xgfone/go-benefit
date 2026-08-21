@@ -182,11 +182,13 @@ func TestEvaluateOperationDecisionStatuses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	supports := benefit.OperationSupports{{
-		Operation:   benefit.OperationReverse,
-		Supported:   true,
-		Constraints: benefit.Constraints{future},
-	}}
+	supports := benefit.OperationSupports{
+		benefit.OperationSupport{
+			Operation:   benefit.OperationReverse,
+			Supported:   true,
+			Constraints: benefit.Constraints{future},
+		},
+	}
 	ineligible, err := benefit.EvaluateOperation(
 		ctx,
 		benefit.DefaultConstraintRegistry,

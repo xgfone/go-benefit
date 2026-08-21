@@ -79,10 +79,7 @@ func (e scopeConstraintEvaluator) Evaluate(
 	return constraintDecision(
 		satisfied,
 		"operation is outside the allowed scope",
-		map[string]any{
-			"match":       params.Match,
-			"value_count": len(values),
-		},
+		map[string]any{"match": params.Match, "values": values},
 	), nil
 }
 

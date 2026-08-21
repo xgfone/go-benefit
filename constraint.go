@@ -30,8 +30,7 @@ func (t ConstraintType) Validate() error {
 type Constraint struct {
 	Type   ConstraintType  `json:"type"`
 	Params json.RawMessage `json:"params,omitempty"`
-
-	Remark string `json:"remark,omitempty"`
+	Remark string          `json:"remark,omitempty"`
 }
 
 // Constraints is an ordered list of constraint definitions.
@@ -115,9 +114,7 @@ type ConstraintDecision struct {
 
 // ConstraintSatisfied returns a successful evaluator decision.
 func ConstraintSatisfied() ConstraintDecision {
-	return ConstraintDecision{
-		Code: ConstraintDecisionSatisfied,
-	}
+	return ConstraintDecision{Code: ConstraintDecisionSatisfied}
 }
 
 // ConstraintUnsatisfied returns an unsuccessful evaluator decision.
@@ -125,6 +122,7 @@ func ConstraintUnsatisfied(code ConstraintDecisionCode, reason string, details m
 	if code == "" || code == ConstraintDecisionSatisfied {
 		code = ConstraintDecisionUnsatisfied
 	}
+
 	return ConstraintDecision{
 		Code: code,
 		Diagnostic: Diagnostic{
@@ -316,11 +314,8 @@ func (r *ConstraintRegistry) Evaluate(
 	if decision.IsSatisfied() {
 		decision.Diagnostic = Diagnostic{}
 	} else if decision.Reason == "" {
-		decision = ConstraintUnsatisfied(
-			ConstraintDecisionError,
-			"constraint evaluator returned a negative decision without a reason",
-			nil,
-		)
+		const msg = "constraint evaluator returned a negative decision without a reason"
+		decision = ConstraintUnsatisfied(ConstraintDecisionError, msg, nil)
 		decision.Type = constraint.Type
 	}
 	return decision

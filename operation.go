@@ -255,12 +255,11 @@ func (s OperationDecisionStatus) Validate() error {
 // OperationDecision combines optional operation support with its constraint
 // report.
 type OperationDecision struct {
-	Operation Operation               `json:"operation"`
-	Status    OperationDecisionStatus `json:"status"`
+	Operation   Operation               `json:"operation"`
+	Constraints ConstraintReport        `json:"constraints"`
+	Status      OperationDecisionStatus `json:"status"`
 
 	Diagnostic
-
-	Constraints ConstraintReport `json:"constraints"`
 }
 
 // IsSupported reports whether the operation capability is available.

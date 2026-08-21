@@ -41,11 +41,9 @@ func evaluateTimeRange(
 	now := input.evaluationTime()
 	satisfied := (params.StartsAt.IsZero() || !now.Before(params.StartsAt)) &&
 		(params.ExpiresAt.IsZero() || now.Before(params.ExpiresAt))
-	return constraintDecision(
-		satisfied,
-		"operation time is outside the allowed range",
-		map[string]any{"evaluated_at": now},
-	), nil
+
+	const msg = "operation time is outside the allowed range"
+	return constraintDecision(satisfied, msg, map[string]any{"evaluated_at": now}), nil
 }
 
 func evaluateWeekday(ctx context.Context, constraint Constraint, input EvaluationInput) (ConstraintDecision, error) {

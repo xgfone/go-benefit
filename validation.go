@@ -43,17 +43,20 @@ func (n Notice) Validate() error {
 	if n.Code == "" {
 		return errors.New("benefit: notice code is empty")
 	}
+
 	switch n.Level {
 	case NoticeInfo, NoticeWarning, NoticeError:
 	default:
 		return fmt.Errorf("benefit: invalid notice level %q", n.Level)
 	}
+
 	if n.Text == "" {
 		return errors.New("benefit: notice text is empty")
 	}
-	if n.Language == "" {
+	if n.Lang == "" {
 		return errors.New("benefit: notice language is empty")
 	}
+
 	return nil
 }
 

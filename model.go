@@ -34,9 +34,9 @@ type NoticeCode string
 type Notice struct {
 	Code  NoticeCode  `json:"code"`
 	Level NoticeLevel `json:"level"`
-	Text  string      `json:"text"`
-	// Language is the BCP 47 language tag for Text.
-	Language string `json:"lang"`
+
+	Text string `json:"text"`
+	Lang string `json:"lang"` // The BCP 47 language tag for Text
 }
 
 // BenefitInfo is the normalized result of inspecting a benefit.
