@@ -10,151 +10,79 @@ import (
 	benefit "github.com/xgfone/go-benefit"
 )
 
-func TestEffectiveOperationSupportsOnlyNarrowsCapabilities(t *testing.T) {
-	const operationArchive benefit.Operation = "Archive"
-	const (
-		modeManual    benefit.OperationMode = "manual"
-		modeAutomatic benefit.OperationMode = "automatic"
-	)
-	declared := benefit.OperationSupports{
-		benefit.OperationSupport{
-			Operation: operationArchive,
-			Supported: true,
-			Modes: []benefit.OperationMode{
-				modeManual,
-				modeAutomatic,
-			},
-		},
-		benefit.OperationSupport{
-			Operation: benefit.OperationReverse,
-			Supported: true,
-			Modes: []benefit.OperationMode{
-				benefit.OperationModeReversePartial,
-			},
-		},
-	}
-	restrictions := benefit.OperationSupports{
-		benefit.OperationSupport{
-			Operation: operationArchive,
-			Supported: true,
-			Modes:     []benefit.OperationMode{modeManual},
-		},
-		benefit.OperationSupport{
-			Operation: benefit.OperationReverse,
-			Supported: false,
-			Remark:    "this benefit is non-reversible",
-		},
-	}
-
-	effective, err := benefit.EffectiveOperationSupports(declared, restrictions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	archive, _ := effective.Get(operationArchive)
-	if !archive.Supported || len(archive.Modes) != 1 || archive.Modes[0] != modeManual {
-		t.Fatalf("unexpected archive support: %#v", archive)
-	}
-	reverse, _ := effective.Get(benefit.OperationReverse)
-	if reverse.Supported || reverse.Remark == "" {
-		t.Fatalf("unexpected reverse support: %#v", reverse)
-	}
-}
-
-func TestReverseOperationModes(t *testing.T) {
-	fullOnly := benefit.OperationSupport{
+func TestOperationCapabilityModes(t *testing.T) {
+	fullOnly := benefit.OperationCapability{
 		Operation: benefit.OperationReverse,
-		Supported: true,
+		Modes:     []benefit.OperationMode{benefit.OperationModeReverseFull},
 	}
 	if !fullOnly.SupportsMode(benefit.OperationModeReverseFull) {
-		t.Fatal("supported reverse operation does not support full reversal")
+		t.Fatal("reverse capability does not support its declared full mode")
 	}
 	if fullOnly.SupportsMode(benefit.OperationModeReversePartial) {
-		t.Fatal("reverse operation with empty modes unexpectedly supports partial reversal")
+		t.Fatal("full-only reverse capability unexpectedly supports partial mode")
 	}
 
-	partial := fullOnly
-	partial.Modes = []benefit.OperationMode{benefit.OperationModeReversePartial}
-	if !partial.SupportsMode(benefit.OperationModeReverseFull) ||
-		!partial.SupportsMode(benefit.OperationModeReversePartial) {
-		t.Fatal("partial reverse operation does not support both full and partial reversal")
+	fullAndPartial := fullOnly
+	fullAndPartial.Modes = []benefit.OperationMode{
+		benefit.OperationModeReverseFull,
+		benefit.OperationModeReversePartial,
 	}
-
-	disabled := partial
-	disabled.Supported = false
-	if disabled.SupportsMode(benefit.OperationModeReverseFull) ||
-		disabled.SupportsMode(benefit.OperationModeReversePartial) {
-		t.Fatal("disabled reverse operation unexpectedly supports a mode")
+	if !fullAndPartial.SupportsMode(benefit.OperationModeReverseFull) ||
+		!fullAndPartial.SupportsMode(benefit.OperationModeReversePartial) {
+		t.Fatal("reverse capability does not support both declared modes")
 	}
 }
 
-func TestOperationSupportsValidation(t *testing.T) {
+func TestOperationCapabilitiesValidation(t *testing.T) {
 	tests := []struct {
-		name     string
-		supports benefit.OperationSupports
+		name         string
+		capabilities benefit.OperationCapabilities
 	}{
-		{"empty operation", benefit.OperationSupports{{}}},
-		{"duplicate operation", benefit.OperationSupports{{Operation: "Archive"}, {Operation: "Archive"}}},
-		{"core operation", benefit.OperationSupports{{Operation: benefit.OperationInspect}}},
-		{"empty mode", benefit.OperationSupports{{Operation: "Archive", Modes: []benefit.OperationMode{""}}}},
-		{"duplicate mode", benefit.OperationSupports{{Operation: "Archive", Modes: []benefit.OperationMode{"manual", "manual"}}}},
-		{"invalid reverse mode", benefit.OperationSupports{{Operation: benefit.OperationReverse, Modes: []benefit.OperationMode{"manual"}}}},
+		{"empty operation", benefit.OperationCapabilities{{}}},
+		{"duplicate operation", benefit.OperationCapabilities{{Operation: "Archive"}, {Operation: "Archive"}}},
+		{"core operation", benefit.OperationCapabilities{{Operation: benefit.OperationInspect}}},
+		{"empty mode", benefit.OperationCapabilities{{Operation: "Archive", Modes: []benefit.OperationMode{""}}}},
+		{"duplicate mode", benefit.OperationCapabilities{{Operation: "Archive", Modes: []benefit.OperationMode{"manual", "manual"}}}},
+		{"invalid reverse mode", benefit.OperationCapabilities{{Operation: benefit.OperationReverse, Modes: []benefit.OperationMode{"manual"}}}},
+		{"reverse without full mode", benefit.OperationCapabilities{{Operation: benefit.OperationReverse, Modes: []benefit.OperationMode{benefit.OperationModeReversePartial}}}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := test.supports.Validate(); err == nil {
-				t.Fatal("invalid operation support unexpectedly validated")
+			if err := test.capabilities.Validate(); err == nil {
+				t.Fatal("invalid operation capabilities unexpectedly validated")
 			}
 		})
 	}
 }
 
-func TestEffectiveOperationSupportsNarrowsPartialReverse(t *testing.T) {
-	declared := benefit.OperationSupports{
-		benefit.OperationSupport{
-			Operation: benefit.OperationReverse,
-			Supported: true,
-			Modes:     []benefit.OperationMode{benefit.OperationModeReversePartial},
-		},
+func TestOperationPoliciesValidation(t *testing.T) {
+	condition := benefit.Constraints{{Type: "test.condition"}}
+	tests := []struct {
+		name     string
+		policies benefit.OperationPolicies
+	}{
+		{"empty operation", benefit.OperationPolicies{{Disabled: true}}},
+		{"core operation", benefit.OperationPolicies{{Operation: benefit.OperationInspect, Disabled: true}}},
+		{"empty match mode", benefit.OperationPolicies{{Operation: "Archive", MatchModes: []benefit.OperationMode{""}, Disabled: true}}},
+		{"duplicate match mode", benefit.OperationPolicies{{Operation: "Archive", MatchModes: []benefit.OperationMode{"manual", "manual"}, Disabled: true}}},
+		{"invalid reverse match mode", benefit.OperationPolicies{{Operation: benefit.OperationReverse, MatchModes: []benefit.OperationMode{"manual"}, Disabled: true}}},
+		{"no effect", benefit.OperationPolicies{{Operation: "Archive"}}},
+		{"disabled and conditional", benefit.OperationPolicies{{Operation: "Archive", Disabled: true, Constraints: condition}}},
 	}
-	restrictions := benefit.OperationSupports{
-		benefit.OperationSupport{
-			Operation: benefit.OperationReverse,
-			Supported: true,
-		},
-	}
-
-	effective, err := benefit.EffectiveOperationSupports(declared, restrictions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	reverse, ok := effective.Get(benefit.OperationReverse)
-	if !ok || !reverse.Supported {
-		t.Fatalf("unexpected reverse support: %#v", reverse)
-	}
-	if !reverse.SupportsMode(benefit.OperationModeReverseFull) {
-		t.Fatal("effective reverse operation does not support full reversal")
-	}
-	if reverse.SupportsMode(benefit.OperationModeReversePartial) {
-		t.Fatal("full-only restriction did not remove partial reversal")
-	}
-}
-
-func TestEffectiveOperationSupportsRejectsExpansion(t *testing.T) {
-	declared := benefit.OperationSupports{
-		benefit.OperationSupport{
-			Operation: benefit.OperationReverse,
-			Supported: true,
-		},
-	}
-	restriction := benefit.OperationSupports{
-		benefit.OperationSupport{
-			Operation: "Archive",
-			Supported: true,
-		},
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.policies.Validate(); err == nil {
+				t.Fatal("invalid operation policies unexpectedly validated")
+			}
+		})
 	}
 
-	if _, err := benefit.EffectiveOperationSupports(declared, restriction); err == nil {
-		t.Fatal("capability expansion unexpectedly succeeded")
+	valid := benefit.OperationPolicies{
+		{Operation: "Archive", Disabled: true},
+		{Operation: "Archive", MatchModes: []benefit.OperationMode{"automatic"}, Constraints: condition},
+	}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("valid overlapping policies failed validation: %v", err)
 	}
 }
 
@@ -163,7 +91,9 @@ func TestEvaluateOperationRejectsCoreOperation(t *testing.T) {
 		context.Background(),
 		benefit.DefaultConstraintRegistry,
 		nil,
+		nil,
 		benefit.OperationRedeem,
+		"",
 		benefit.EvaluationInput{},
 	); err == nil {
 		t.Fatal("core operation unexpectedly used optional capability evaluation")
@@ -179,7 +109,9 @@ func TestEvaluateOperationDecisionStatuses(t *testing.T) {
 		ctx,
 		benefit.DefaultConstraintRegistry,
 		nil,
+		nil,
 		benefit.OperationReverse,
+		benefit.OperationModeReverseFull,
 		input,
 	)
 	if err != nil {
@@ -203,18 +135,26 @@ func TestEvaluateOperationDecisionStatuses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	supports := benefit.OperationSupports{
-		benefit.OperationSupport{
-			Operation:   benefit.OperationReverse,
-			Supported:   true,
-			Constraints: benefit.Constraints{future},
+	capabilities := benefit.OperationCapabilities{
+		benefit.OperationCapability{
+			Operation: benefit.OperationReverse,
+			Modes: []benefit.OperationMode{
+				benefit.OperationModeReverseFull,
+				benefit.OperationModeReversePartial,
+			},
 		},
 	}
+	policies := benefit.OperationPolicies{{
+		Operation:   benefit.OperationReverse,
+		Constraints: benefit.Constraints{future},
+	}}
 	ineligible, err := benefit.EvaluateOperation(
 		ctx,
 		benefit.DefaultConstraintRegistry,
-		supports,
+		capabilities,
+		policies,
 		benefit.OperationReverse,
+		benefit.OperationModeReverseFull,
 		input,
 	)
 	if err != nil {
@@ -241,13 +181,16 @@ func TestEvaluateOperationDecisionStatuses(t *testing.T) {
 		t.Fatalf("operation definition leaked into decision JSON: %s", encoded)
 	}
 
-	supports[0].Constraints = nil
+	eligibleInput := input
+	eligibleInput.Now = now.Add(2 * time.Hour)
 	eligible, err := benefit.EvaluateOperation(
 		ctx,
 		benefit.DefaultConstraintRegistry,
-		supports,
+		capabilities,
+		policies,
 		benefit.OperationReverse,
-		input,
+		benefit.OperationModeReverseFull,
+		eligibleInput,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -260,6 +203,103 @@ func TestEvaluateOperationDecisionStatuses(t *testing.T) {
 	}
 	if err := eligible.Validate(); err != nil {
 		t.Fatalf("eligible decision failed validation: %v", err)
+	}
+}
+
+func TestEvaluateOperationMatchesPoliciesByMode(t *testing.T) {
+	capabilities := benefit.OperationCapabilities{{
+		Operation: benefit.OperationReverse,
+		Modes: []benefit.OperationMode{
+			benefit.OperationModeReverseFull,
+			benefit.OperationModeReversePartial,
+		},
+	}}
+	policies := benefit.OperationPolicies{{
+		Operation:  benefit.OperationReverse,
+		MatchModes: []benefit.OperationMode{benefit.OperationModeReversePartial},
+		Disabled:   true,
+		Remark:     "operator-only partial reversal policy",
+	}}
+
+	partial, err := benefit.EvaluateOperation(
+		context.Background(),
+		benefit.DefaultConstraintRegistry,
+		capabilities,
+		policies,
+		benefit.OperationReverse,
+		benefit.OperationModeReversePartial,
+		benefit.EvaluationInput{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if partial.Status != benefit.OperationDecisionStatusUnsupported ||
+		partial.Mode != benefit.OperationModeReversePartial ||
+		strings.Contains(partial.Reason, "operator-only") {
+		t.Fatalf("unexpected partial reverse decision: %#v", partial)
+	}
+
+	full, err := benefit.EvaluateOperation(
+		context.Background(),
+		benefit.DefaultConstraintRegistry,
+		capabilities,
+		policies,
+		benefit.OperationReverse,
+		benefit.OperationModeReverseFull,
+		benefit.EvaluationInput{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if full.Status != benefit.OperationDecisionStatusEligible || !full.IsEligible() {
+		t.Fatalf("unexpected full reverse decision: %#v", full)
+	}
+
+	operation, err := benefit.EvaluateOperation(
+		context.Background(),
+		benefit.DefaultConstraintRegistry,
+		capabilities,
+		policies,
+		benefit.OperationReverse,
+		"",
+		benefit.EvaluationInput{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if operation.Status != benefit.OperationDecisionStatusEligible {
+		t.Fatalf("mode-specific policy unexpectedly matched operation-level evaluation: %#v", operation)
+	}
+}
+
+func TestEvaluateOperationRejectsPoliciesOutsideCapability(t *testing.T) {
+	capabilities := benefit.OperationCapabilities{{
+		Operation: benefit.OperationReverse,
+		Modes:     []benefit.OperationMode{benefit.OperationModeReverseFull},
+	}}
+	tests := map[string]benefit.OperationPolicies{
+		"unsupported operation": {{Operation: "Archive", Disabled: true}},
+		"unsupported mode": {{
+			Operation:  benefit.OperationReverse,
+			MatchModes: []benefit.OperationMode{benefit.OperationModeReversePartial},
+			Disabled:   true,
+		}},
+	}
+
+	for name, policies := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := benefit.EvaluateOperation(
+				context.Background(),
+				benefit.DefaultConstraintRegistry,
+				capabilities,
+				policies,
+				benefit.OperationReverse,
+				benefit.OperationModeReverseFull,
+				benefit.EvaluationInput{},
+			); err == nil {
+				t.Fatal("operation policy outside driver capability unexpectedly evaluated")
+			}
+		})
 	}
 }
 

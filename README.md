@@ -76,15 +76,26 @@ to call it before `Redeem`. `Redeem` is authoritative, accepts an empty
 `EvaluationToken`, and must recheck current status, provider matching, and all
 constraints even when an earlier evaluation was eligible.
 
-A supported `Reverse` operation always supports full reversal. Partial reversal
-is supported only when its declared modes contain `partial`; an empty mode list
-therefore means full-only. A driver that declares Reverse must implement
-`Reverser`.
+`DriverDescriptor.Operations` declares the driver type's maximum optional
+`OperationCapabilities`. Presence means supported; there is no separate
+supported flag. Modes are explicit: a Reverse capability must contain `full`
+and may additionally contain `partial`. A driver that declares Reverse must
+implement `Reverser`.
 
-`OperationSupport` is an internal capability definition. `EvaluateOperation`
-returns an `OperationDecision` whose mutually exclusive status is `unsupported`,
-`ineligible`, or `eligible`; raw operation constraints and operator remarks are
-not part of that decision.
+`BenefitInfo.OperationPolicies` contains sparse, benefit-specific exceptions to
+those driver capabilities. With no policies, the benefit inherits the complete
+driver capability set. A policy with `Disabled` permanently disables its matched
+operation or modes. A conditional policy instead supplies positive availability
+constraints: all constraints from all matching policies must be satisfied.
+`MatchModes` is a selector; an empty list matches the whole operation, while a
+non-empty list matches only the listed modes. Policies cannot introduce an
+operation or mode outside the driver's capabilities.
+
+`EvaluateOperation` combines capabilities and policies for one operation and
+optional mode. A missing capability or matching permanent disablement produces
+`unsupported`; an unsatisfied conditional policy produces `ineligible`; and
+satisfied constraints produce `eligible`. Raw policy constraints and operator
+remarks are not part of the returned `OperationDecision`.
 
 ## Constraints
 

@@ -20,14 +20,14 @@ func (t DriverType) Validate() error {
 }
 
 // DriverDescriptor is the global, configuration-independent driver metadata.
-// Operations contains only optional capabilities beyond Inspect, Evaluate,
-// and Redeem, which every Driver supports unconditionally.
+// Operations contains the driver type's maximum optional capabilities beyond
+// Inspect, Evaluate, and Redeem, which every Driver supports unconditionally.
 type DriverDescriptor struct {
-	Name       string            `json:"name"`
-	Type       DriverType        `json:"type"`
-	Kind       TypeDescriptor    `json:"kind"`
-	Provider   TypeDescriptor    `json:"provider"`
-	Operations OperationSupports `json:"operations,omitempty"`
+	Name       string                `json:"name"`
+	Type       DriverType            `json:"type"`
+	Kind       TypeDescriptor        `json:"kind"`
+	Provider   TypeDescriptor        `json:"provider"`
+	Operations OperationCapabilities `json:"operations,omitempty"`
 }
 
 // Descriptor returns the type descriptor of the driver.

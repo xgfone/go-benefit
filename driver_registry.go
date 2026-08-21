@@ -188,8 +188,8 @@ func (r *DriverRegistry) Bind(driverType DriverType, config DriverConfig) (Drive
 }
 
 func validateDriverOperation[T any](driver Driver, op Operation) error {
-	support, ok := driver.Descriptor().Operations.Get(op)
-	if !ok || !support.Supported {
+	_, ok := driver.Descriptor().Operations.Get(op)
+	if !ok {
 		return nil
 	}
 
@@ -209,7 +209,7 @@ func validateDriverConfigPresence(schema ConfigSchema, config DriverConfig) erro
 }
 
 func cloneDriverDescriptor(descriptor DriverDescriptor) DriverDescriptor {
-	descriptor.Operations = cloneOperationSupports(descriptor.Operations)
+	descriptor.Operations = cloneOperationCapabilities(descriptor.Operations)
 	return descriptor
 }
 

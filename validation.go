@@ -74,7 +74,7 @@ func (b BenefitInfo) Validate() error {
 	if err := b.Usage.Validate(); err != nil {
 		return err
 	}
-	if err := b.Operations.Validate(); err != nil {
+	if err := b.OperationPolicies.Validate(); err != nil {
 		return err
 	}
 	for _, notice := range b.Notices {

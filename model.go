@@ -45,11 +45,14 @@ type BenefitInfo struct {
 	Status     Status     `json:"status"`
 	DriverType DriverType `json:"driver_type"`
 
-	Usage       Usage             `json:"usage,omitzero"`
-	Validity    Validity          `json:"validity,omitzero"`
-	Constraints Constraints       `json:"-"`
-	Operations  OperationSupports `json:"-"`
-	Notices     []Notice          `json:"notices,omitempty"`
+	Usage       Usage       `json:"usage,omitzero"`
+	Validity    Validity    `json:"validity,omitzero"`
+	Constraints Constraints `json:"-"`
+
+	// OperationPolicies contains only benefit-specific exceptions. Driver-wide
+	// maximum capabilities come from DriverDescriptor.Operations.
+	OperationPolicies OperationPolicies `json:"-"`
+	Notices           []Notice          `json:"notices,omitempty"`
 
 	// ProviderBenefitID is an optional non-secret provider record identifier.
 	// Bearer credentials belong in BenefitReference instead.

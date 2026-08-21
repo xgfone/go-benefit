@@ -41,10 +41,10 @@ func (exampleDriverDefinition) Descriptor() benefit.DriverDescriptor {
 			Type: "coupon",
 			Name: "Coupon",
 		},
-		Operations: benefit.OperationSupports{
-			benefit.OperationSupport{
+		Operations: benefit.OperationCapabilities{
+			benefit.OperationCapability{
 				Operation: benefit.OperationReverse,
-				Supported: true,
+				Modes:     []benefit.OperationMode{benefit.OperationModeReverseFull},
 			},
 		},
 	}
@@ -194,7 +194,6 @@ func (d *exampleCouponDriver) Inspect(
 		Status:            status,
 		Usage:             benefit.Usage{RemainingCount: 1},
 		Constraints:       append(benefit.Constraints(nil), d.constraints...),
-		Operations:        d.Descriptor().Operations,
 	}, nil
 }
 

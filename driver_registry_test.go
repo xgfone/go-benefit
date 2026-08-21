@@ -326,17 +326,16 @@ func newFakeDefinition(kind string, declareReverse, driverHasReverse bool) *fake
 }
 
 func (d *fakeDefinition) Descriptor() benefit.DriverDescriptor {
-	var operations benefit.OperationSupports
+	var operations benefit.OperationCapabilities
 	if d.declareCoreOperation != "" {
-		operations = append(operations, benefit.OperationSupport{
+		operations = append(operations, benefit.OperationCapability{
 			Operation: d.declareCoreOperation,
-			Supported: true,
 		})
 	}
 	if d.declareReverse {
-		operations = append(operations, benefit.OperationSupport{
+		operations = append(operations, benefit.OperationCapability{
 			Operation: benefit.OperationReverse,
-			Supported: true,
+			Modes:     []benefit.OperationMode{benefit.OperationModeReverseFull},
 		})
 	}
 	return benefit.DriverDescriptor{

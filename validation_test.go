@@ -150,7 +150,12 @@ func TestRequestJSONOmitsInProcessValues(t *testing.T) {
 	}
 }
 
-func TestBenefitInfoDoesNotMarshalConstraintOrOperationDefinitions(t *testing.T) {
+func TestBenefitInfoDoesNotMarshalConstraintOrOperationPolicyDefinitions(t *testing.T) {
+	operationConstraint := benefit.Constraint{
+		Type:   "test.operation_rule",
+		Params: json.RawMessage(`{"secret":"operation-secret"}`),
+		Remark: "operator-only operation constraint",
+	}
 	value := benefit.BenefitInfo{
 		Status:     benefit.StatusActive,
 		DriverType: "test.coupon",
@@ -161,11 +166,12 @@ func TestBenefitInfoDoesNotMarshalConstraintOrOperationDefinitions(t *testing.T)
 				Remark: "operator-only constraint remark",
 			},
 		},
-		Operations: benefit.OperationSupports{
-			benefit.OperationSupport{
-				Operation: benefit.OperationReverse,
-				Supported: true,
-				Remark:    "operator-only operation remark",
+		OperationPolicies: benefit.OperationPolicies{
+			benefit.OperationPolicy{
+				Operation:   benefit.OperationReverse,
+				MatchModes:  []benefit.OperationMode{benefit.OperationModeReverseFull},
+				Constraints: benefit.Constraints{operationConstraint},
+				Remark:      "operator-only operation policy",
 			},
 		},
 	}
@@ -174,9 +180,10 @@ func TestBenefitInfoDoesNotMarshalConstraintOrOperationDefinitions(t *testing.T)
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if strings.Contains(encoded, `"constraints"`) || strings.Contains(encoded, `"operations"`) ||
-		strings.Contains(encoded, "constraint-secret") || strings.Contains(encoded, "operator-only") {
-		t.Fatalf("constraint or operation definition leaked into benefit JSON: %s", encoded)
+	if strings.Contains(encoded, `"constraints"`) || strings.Contains(encoded, `"operation_policies"`) ||
+		strings.Contains(encoded, "constraint-secret") || strings.Contains(encoded, "operation-secret") ||
+		strings.Contains(encoded, "operator-only") {
+		t.Fatalf("constraint or operation policy definition leaked into benefit JSON: %s", encoded)
 	}
 }
 
