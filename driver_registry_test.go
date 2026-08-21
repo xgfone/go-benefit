@@ -79,17 +79,37 @@ func TestDriverRegistry(t *testing.T) {
 	if result.Status != benefit.ResultStatusFailure {
 		t.Fatalf("unexpected reverse result: %#v", result)
 	}
+	if got, ok := registry.Get("test.coupon"); !ok || got != definition {
+		t.Fatal("registered driver definition was not returned")
+	}
+	if !registry.Unregister("test.coupon") || registry.Unregister("test.coupon") {
+		t.Fatal("driver unregister result was incorrect")
+	}
+	if _, ok := registry.Get("test.coupon"); ok {
+		t.Fatal("unregistered driver definition was still returned")
+	}
 }
 
-func TestDriverRegistryRejectsInvalidConfigSchema(t *testing.T) {
-	definition := newFakeDefinition("invalid_schema", false, false)
-	definition.schema = benefit.ConfigSchema{
-		Revision: "v1",
-		Schema:   json.RawMessage(`{"type":"object"}`),
+func TestConfigSchemaValidation(t *testing.T) {
+	const dialect = `"$schema":"https://json-schema.org/draft/2020-12/schema"`
+	tests := map[string]benefit.ConfigSchema{
+		"empty revision":       {Schema: json.RawMessage(`{` + dialect + `,"type":"object"}`)},
+		"empty document":       {Revision: "v1"},
+		"invalid JSON":         {Revision: "v1", Schema: json.RawMessage(`{`)},
+		"non-object document":  {Revision: "v1", Schema: json.RawMessage(`null`)},
+		"missing dialect":      {Revision: "v1", Schema: json.RawMessage(`{"type":"object"}`)},
+		"non-string dialect":   {Revision: "v1", Schema: json.RawMessage(`{"$schema":1,"type":"object"}`)},
+		"unsupported dialect":  {Revision: "v1", Schema: json.RawMessage(`{"$schema":"other","type":"object"}`)},
+		"missing root type":    {Revision: "v1", Schema: json.RawMessage(`{` + dialect + `}`)},
+		"non-string root type": {Revision: "v1", Schema: json.RawMessage(`{` + dialect + `,"type":1}`)},
+		"non-object root type": {Revision: "v1", Schema: json.RawMessage(`{` + dialect + `,"type":"array"}`)},
 	}
-
-	if err := benefit.NewDriverRegistry().Register(definition); err == nil {
-		t.Fatal("driver with an invalid config schema unexpectedly registered")
+	for name, schema := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := schema.Validate(); err == nil {
+				t.Fatal("invalid config schema unexpectedly validated")
+			}
+		})
 	}
 }
 
@@ -137,6 +157,48 @@ func TestDriverDescriptorTypeDescriptor(t *testing.T) {
 		merged.Name != "Provider coupon" ||
 		merged.Icon != "provider-icon" {
 		t.Fatalf("unexpected merged descriptor: %#v", merged)
+	}
+}
+
+func TestDriverDescriptorValidation(t *testing.T) {
+	valid := newFakeDefinition("coupon", false, false).Descriptor()
+	tests := []struct {
+		name   string
+		mutate func(*benefit.DriverDescriptor)
+	}{
+		{"invalid type", func(d *benefit.DriverDescriptor) { d.Type = "coupon" }},
+		{"empty name", func(d *benefit.DriverDescriptor) { d.Name = "" }},
+		{"empty kind", func(d *benefit.DriverDescriptor) { d.Kind.Type = "" }},
+		{"empty provider", func(d *benefit.DriverDescriptor) { d.Provider.Type = "" }},
+		{"mismatched type", func(d *benefit.DriverDescriptor) { d.Type = "other.coupon" }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			descriptor := valid
+			test.mutate(&descriptor)
+			if err := descriptor.Validate(); err == nil {
+				t.Fatal("invalid descriptor unexpectedly validated")
+			}
+		})
+	}
+}
+
+func TestNilDriverRegistryAndFactory(t *testing.T) {
+	var registry *benefit.DriverRegistry
+	if err := registry.Register(nil); err == nil {
+		t.Fatal("nil registry unexpectedly accepted a definition")
+	}
+	if registry.Unregister("test.coupon") || registry.Descriptors() != nil {
+		t.Fatal("nil registry unexpectedly contained drivers")
+	}
+	if _, ok := registry.Get("test.coupon"); ok {
+		t.Fatal("nil registry unexpectedly returned a definition")
+	}
+	if err := benefit.NewDriverRegistry().Register(nil); err == nil {
+		t.Fatal("nil driver definition unexpectedly registered")
+	}
+	if _, err := (benefit.DriverFactoryFunc(nil)).NewDriver(); err == nil {
+		t.Fatal("nil driver factory function unexpectedly constructed a driver")
 	}
 }
 

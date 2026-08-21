@@ -30,53 +30,69 @@ func TestValidityOmitsZeroTimes(t *testing.T) {
 	if !strings.Contains(encoded, `"starts_at":`) || strings.Contains(encoded, `"expires_at":`) {
 		t.Fatalf("unexpected validity JSON: %s", encoded)
 	}
+	if (benefit.Validity{StartsAt: startsAt}).IsZero() {
+		t.Fatal("non-zero validity was reported as zero")
+	}
 }
 
-func TestModelsOmitZeroTimes(t *testing.T) {
-	inputData, err := json.Marshal(benefit.EvaluationInput{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(inputData), `"now"`) {
-		t.Fatalf("zero evaluation time was not omitted: %s", inputData)
-	}
-
-	evaluationData, err := json.Marshal(benefit.EvaluationResult{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(evaluationData), `"expires_at"`) {
-		t.Fatalf("zero evaluation expiry was not omitted: %s", evaluationData)
-	}
-	if strings.Contains(string(evaluationData), `"outcome"`) {
-		t.Fatalf("zero evaluation outcome was not omitted: %s", evaluationData)
+func TestSimpleValueValidation(t *testing.T) {
+	now := time.Date(2026, 8, 18, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{"invalid status", benefit.Status("invalid").Validate()},
+		{"reversed validity", (benefit.Validity{StartsAt: now, ExpiresAt: now}).Validate()},
+		{"negative redeemed count", (benefit.Usage{RedeemedCount: -1}).Validate()},
+		{"negative remaining count", (benefit.Usage{RemainingCount: -1}).Validate()},
+		{"notice without code", (benefit.Notice{Level: benefit.NoticeInfo, Text: "text", Lang: "en"}).Validate()},
+		{"notice with invalid level", (benefit.Notice{Code: "test.notice", Level: "invalid", Text: "text", Lang: "en"}).Validate()},
+		{"notice without text", (benefit.Notice{Code: "test.notice", Level: benefit.NoticeInfo, Lang: "en"}).Validate()},
 	}
 
-	redemptionData, err := json.Marshal(benefit.Redemption{RedemptionID: "R1"})
-	if err != nil {
-		t.Fatal(err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.err == nil {
+				t.Fatal("invalid value unexpectedly validated")
+			}
+		})
 	}
-	if strings.Contains(string(redemptionData), `"outcome"`) {
-		t.Fatalf("zero redemption outcome was not omitted: %s", redemptionData)
-	}
+}
 
+func TestModelsOmitZeroValues(t *testing.T) {
 	reversal := benefit.Reversal{
 		ReversalID:   "RV1",
 		RedemptionID: "R1",
 	}
-	reversalData, err := json.Marshal(reversal)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name   string
+		value  any
+		fields []string
+	}{
+		{"evaluation input", benefit.EvaluationInput{}, []string{"now"}},
+		{"evaluation result", benefit.EvaluationResult{}, []string{"expires_at", "outcome"}},
+		{"redemption", benefit.Redemption{RedemptionID: "R1"}, []string{"outcome"}},
+		{"reversal", reversal, []string{"restored_amount"}},
 	}
-	if strings.Contains(string(reversalData), `"restored_amount"`) {
-		t.Fatalf("zero restored amount was not omitted: %s", reversalData)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data, err := json.Marshal(test.value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, field := range test.fields {
+				if strings.Contains(string(data), `"`+field+`"`) {
+					t.Fatalf("zero field %q was not omitted: %s", field, data)
+				}
+			}
+		})
 	}
 
 	reversal.RestoredAmount = benefit.Money{Currency: "CNY"}
 	if err := reversal.Validate(); err != nil {
 		t.Fatalf("explicit zero restored amount failed validation: %v", err)
 	}
-	reversalData, err = json.Marshal(reversal)
+	reversalData, err := json.Marshal(reversal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,8 +120,14 @@ func TestRequestValidation(t *testing.T) {
 	if err := (benefit.ReverseRequest{RedemptionID: "R1"}).Validate(); err == nil {
 		t.Fatal("reverse request without a reversal id unexpectedly validated")
 	}
+	if err := (benefit.ReverseRequest{ReversalID: "RV1"}).Validate(); err == nil {
+		t.Fatal("reverse request without a redemption id unexpectedly validated")
+	}
 	if err := (benefit.ReverseRequest{ReversalID: "RV1", RedemptionID: "R1"}).Validate(); err != nil {
 		t.Fatalf("valid reverse request failed: %v", err)
+	}
+	if !(benefit.BenefitReference{}).IsZero() || (benefit.BenefitReference{Value: "B1"}).IsZero() {
+		t.Fatal("benefit reference zero detection is incorrect")
 	}
 }
 

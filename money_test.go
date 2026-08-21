@@ -27,10 +27,19 @@ func TestMoneyMajorMinorConversion(t *testing.T) {
 	if major != "12.34" {
 		t.Fatalf("got major %q, want 12.34", major)
 	}
+	if _, err := benefit.NewMoney(1, "invalid"); err == nil {
+		t.Fatal("unsupported currency unexpectedly constructed money")
+	}
+	if _, err := benefit.ParseMajorMoney("not-a-number", "CNY"); err == nil {
+		t.Fatal("invalid major amount unexpectedly parsed")
+	}
+	if _, err := (benefit.Money{}).Major(); err == nil {
+		t.Fatal("money without a currency unexpectedly formatted")
+	}
 }
 
 func TestDiscountEffectValidation(t *testing.T) {
-	valid := benefit.DiscountEffect{
+	percentage := benefit.DiscountEffect{
 		Type:           benefit.DiscountEffectPercentage,
 		Currency:       "CNY",
 		OriginalAmount: 12000,
@@ -38,37 +47,65 @@ func TestDiscountEffectValidation(t *testing.T) {
 		DiscountAmount: 2400,
 		PayableAmount:  9600,
 	}
-	if err := valid.Validate(); err != nil {
-		t.Fatalf("valid effect failed: %v", err)
-	}
-
-	invalid := valid
-	invalid.PayableAmount = 9500
-	if err := invalid.Validate(); err == nil {
-		t.Fatal("inconsistent effect unexpectedly validated")
-	}
-
 	free := benefit.DiscountEffect{
 		Type:           benefit.DiscountEffectFree,
 		Currency:       "CNY",
 		OriginalAmount: 12000,
 		DiscountAmount: 12000,
 	}
-	if err := free.Validate(); err != nil {
-		t.Fatalf("valid free effect failed: %v", err)
+	for name, effect := range map[string]benefit.DiscountEffect{
+		"percentage": percentage,
+		"free":       free,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := effect.Validate(); err != nil {
+				t.Fatalf("valid effect failed: %v", err)
+			}
+		})
 	}
 
+	inconsistent := percentage
+	inconsistent.PayableAmount = 9500
 	invalidFree := free
 	invalidFree.DiscountAmount = 11000
 	invalidFree.PayableAmount = 1000
-	if err := invalidFree.Validate(); err == nil {
-		t.Fatal("free effect with a payable amount unexpectedly validated")
+	providerCalculated := percentage
+	providerCalculated.Type = "provider_calculated"
+	invalidCurrency := percentage
+	invalidCurrency.Currency = "invalid"
+	negativeAmount := percentage
+	negativeAmount.DiscountAmount = -1
+	invalidEffects := map[string]benefit.DiscountEffect{
+		"inconsistent amounts": inconsistent,
+		"payable free effect":  invalidFree,
+		"invalid type":         providerCalculated,
+		"invalid currency":     invalidCurrency,
+		"negative amount":      negativeAmount,
+	}
+	for rate, name := range map[string]string{
+		"":     "empty pay rate",
+		"bad":  "invalid pay rate",
+		"-0.1": "negative pay rate",
+		"1.1":  "pay rate above one",
+	} {
+		effect := percentage
+		effect.PayRate = rate
+		invalidEffects[name] = effect
+	}
+	for name, effect := range invalidEffects {
+		t.Run(name, func(t *testing.T) {
+			if err := effect.Validate(); err == nil {
+				t.Fatal("invalid discount effect unexpectedly validated")
+			}
+		})
 	}
 
-	providerCalculated := valid
-	providerCalculated.Type = "provider_calculated"
-	if err := providerCalculated.Validate(); err == nil {
-		t.Fatal("removed provider-calculated effect unexpectedly validated")
+	for _, rate := range []string{"0", "0.0", "1", "1.0", "1/2"} {
+		effect := percentage
+		effect.PayRate = rate
+		if err := effect.Validate(); err != nil {
+			t.Fatalf("valid pay rate %q failed: %v", rate, err)
+		}
 	}
 }
 
@@ -123,6 +160,16 @@ func TestResolveStatusPrecedence(t *testing.T) {
 			want: benefit.StatusVoided,
 		},
 		{
+			name:  "suspended remains terminal",
+			facts: benefit.StatusFacts{ProviderStatus: benefit.StatusSuspended},
+			want:  benefit.StatusSuspended,
+		},
+		{
+			name:  "provider exhausted remains terminal",
+			facts: benefit.StatusFacts{ProviderStatus: benefit.StatusExhausted},
+			want:  benefit.StatusExhausted,
+		},
+		{
 			name: "exhausted wins over expired",
 			facts: benefit.StatusFacts{
 				ProviderStatus: benefit.StatusActive,
@@ -138,6 +185,19 @@ func TestResolveStatusPrecedence(t *testing.T) {
 				Validity:       benefit.Validity{StartsAt: future},
 			},
 			want: benefit.StatusPending,
+		},
+		{
+			name: "expired is derived from time",
+			facts: benefit.StatusFacts{
+				ProviderStatus: benefit.StatusActive,
+				Validity:       benefit.Validity{ExpiresAt: past},
+			},
+			want: benefit.StatusExpired,
+		},
+		{
+			name:  "provider active remains active",
+			facts: benefit.StatusFacts{ProviderStatus: benefit.StatusActive},
+			want:  benefit.StatusActive,
 		},
 		{
 			name: "unknown remains unknown inside the window",

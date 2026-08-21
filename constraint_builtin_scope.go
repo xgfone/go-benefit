@@ -16,12 +16,17 @@ const (
 )
 
 // ScopeConstraintParams configures an allow-list scope constraint.
+//
+// Values must be non-sensitive because failed decisions may expose scope values
+// in Diagnostic.Details for troubleshooting.
 type ScopeConstraintParams struct {
 	Values []string   `json:"values"`
 	Match  ScopeMatch `json:"match,omitempty"`
 }
 
 // ScopeValuesExtractor extracts application-defined values for scope matching.
+// Returned values must be non-sensitive because failed decisions include them
+// in Diagnostic.Details for troubleshooting.
 type ScopeValuesExtractor func(EvaluationInput) ([]string, error)
 
 type scopeConstraintEvaluator struct {

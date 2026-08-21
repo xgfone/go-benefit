@@ -56,6 +56,66 @@ func TestUnregisteredConstraintTypeIsUnrecognized(t *testing.T) {
 	}
 }
 
+func TestConstraintDefinitionErrors(t *testing.T) {
+	if _, err := benefit.NewConstraint("", "", nil); err == nil {
+		t.Fatal("constraint without a type unexpectedly constructed")
+	}
+	if _, err := benefit.NewConstraint("test.invalid", "", make(chan int)); err == nil {
+		t.Fatal("constraint with unencodable params unexpectedly constructed")
+	}
+
+	for name, constraint := range map[string]benefit.Constraint{
+		"empty":   {Type: "test.empty"},
+		"invalid": {Type: "test.invalid", Params: []byte(`{`)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var params map[string]any
+			if err := constraint.DecodeParams(&params); err == nil {
+				t.Fatal("invalid params unexpectedly decoded")
+			}
+		})
+	}
+	if err := (benefit.Constraint{Params: []byte(`{}`)}).DecodeParams(nil); err == nil {
+		t.Fatal("nil params destination unexpectedly accepted")
+	}
+}
+
+func TestConstraintRegistryLifecycle(t *testing.T) {
+	var nilRegistry *benefit.ConstraintRegistry
+	if err := nilRegistry.Register("test.rule", benefit.ConstraintEvaluatorFunc(nil)); err == nil {
+		t.Fatal("nil registry unexpectedly accepted a registration")
+	}
+	if nilRegistry.Unregister("test.rule") || nilRegistry.Types() != nil {
+		t.Fatal("nil registry unexpectedly contained constraints")
+	}
+	if _, ok := nilRegistry.Get("test.rule"); ok {
+		t.Fatal("nil registry unexpectedly returned an evaluator")
+	}
+
+	evaluator := benefit.ConstraintEvaluatorFunc(func(
+		context.Context,
+		benefit.Constraint,
+		benefit.EvaluationInput,
+	) (benefit.ConstraintDecision, error) {
+		return benefit.ConstraintSatisfied(), nil
+	})
+	registry := benefit.NewConstraintRegistry()
+	for _, typ := range []benefit.ConstraintType{"test.z", "test.a"} {
+		if err := registry.Register(typ, evaluator); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if types := registry.Types(); len(types) != 2 || types[0] != "test.a" || types[1] != "test.z" {
+		t.Fatalf("constraint types were not sorted: %#v", types)
+	}
+	if _, ok := registry.Get("test.a"); !ok {
+		t.Fatal("registered evaluator was not found")
+	}
+	if !registry.Unregister("test.a") || registry.Unregister("test.a") {
+		t.Fatal("constraint unregister result was incorrect")
+	}
+}
+
 func TestExtractedAmountAndScopeConstraints(t *testing.T) {
 	const productScope benefit.ConstraintType = "test.product_scope"
 	minimum := mustConstraint(t, benefit.ConstraintMinimumAmount, benefit.AmountConstraintParams{
@@ -96,16 +156,17 @@ func TestExtractedAmountAndScopeConstraints(t *testing.T) {
 		t.Fatalf("constraints unexpectedly failed: %#v", report.Violations)
 	}
 
-	input.Context = testOperationContext{Products: []string{"SENSITIVE-PRODUCT"}}
+	input.Context = testOperationContext{Products: []string{"P9"}}
 	report = registry.EvaluateAll(context.Background(), input, benefit.Constraints{products})
 	if report.IsSatisfied() || len(report.Violations) != 1 {
 		t.Fatalf("out-of-scope product unexpectedly satisfied: %#v", report)
 	}
-	if _, leaked := report.Violations[0].Details["values"]; leaked {
-		t.Fatalf("scope values leaked into decision details: %#v", report.Violations[0])
+	values, ok := report.Violations[0].Details["values"].([]string)
+	if !ok || len(values) != 1 || values[0] != "P9" {
+		t.Fatalf("unexpected diagnostic scope values: %#v", report.Violations[0].Details)
 	}
-	if count, ok := report.Violations[0].Details["value_count"].(int); !ok || count != 1 {
-		t.Fatalf("unexpected safe scope details: %#v", report.Violations[0].Details)
+	if _, exists := report.Violations[0].Details["value_count"]; exists {
+		t.Fatalf("unexpected scope value count: %#v", report.Violations[0].Details)
 	}
 }
 
@@ -129,6 +190,161 @@ func TestAmountConstraintRejectsCurrencyMismatch(t *testing.T) {
 	decision := registry.Evaluate(context.Background(), minimum, input)
 	if decision.IsSatisfied() || decision.Code != benefit.ConstraintDecisionUnsatisfied {
 		t.Fatalf("unexpected currency decision: %#v", decision)
+	}
+}
+
+func TestAmountConstraintEvaluatorBranches(t *testing.T) {
+	validMaximum := mustConstraint(t, benefit.ConstraintMaximumAmount, benefit.AmountConstraintParams{
+		Amount:   100,
+		Currency: "USD",
+	})
+	validMinimum := validMaximum
+	validMinimum.Type = benefit.ConstraintMinimumAmount
+	invalidAmount := mustConstraint(t, benefit.ConstraintMinimumAmount, benefit.AmountConstraintParams{
+		Amount:   -1,
+		Currency: "USD",
+	})
+	invalidCurrency := mustConstraint(t, benefit.ConstraintMinimumAmount, benefit.AmountConstraintParams{
+		Amount:   1,
+		Currency: "invalid",
+	})
+	maximum := benefit.NewMaximumAmountConstraintEvaluator(
+		staticAmountExtractor(benefit.Money{Amount: 101, Currency: "USD"}, true, nil),
+	)
+	unavailable := benefit.NewMinimumAmountConstraintEvaluator(staticAmountExtractor(benefit.Money{}, false, nil))
+	extractorError := benefit.NewMinimumAmountConstraintEvaluator(
+		staticAmountExtractor(benefit.Money{}, false, errors.New("extract failed")),
+	)
+	invalidActual := benefit.NewMinimumAmountConstraintEvaluator(
+		staticAmountExtractor(benefit.Money{Amount: -1, Currency: "USD"}, true, nil),
+	)
+	available := benefit.NewMinimumAmountConstraintEvaluator(
+		staticAmountExtractor(benefit.Money{Currency: "USD"}, true, nil),
+	)
+
+	tests := []struct {
+		name       string
+		evaluator  benefit.ConstraintEvaluator
+		constraint benefit.Constraint
+		wantCode   benefit.ConstraintDecisionCode
+		wantError  bool
+	}{
+		{"maximum exceeded", maximum, validMaximum, benefit.ConstraintDecisionUnsatisfied, false},
+		{"amount unavailable", unavailable, validMinimum, benefit.ConstraintDecisionUnsatisfied, false},
+		{"nil extractor", benefit.NewMinimumAmountConstraintEvaluator(nil), validMinimum, "", true},
+		{"extractor error", extractorError, validMinimum, "", true},
+		{"invalid actual amount", invalidActual, validMinimum, "", true},
+		{"invalid constraint amount", available, invalidAmount, benefit.ConstraintDecisionInvalid, false},
+		{"invalid constraint currency", available, invalidCurrency, benefit.ConstraintDecisionInvalid, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			decision, err := test.evaluator.Evaluate(context.Background(), test.constraint, benefit.EvaluationInput{})
+			if (err != nil) != test.wantError {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !test.wantError && decision.Code != test.wantCode {
+				t.Fatalf("got decision %#v, want code %q", decision, test.wantCode)
+			}
+		})
+	}
+}
+
+func staticAmountExtractor(money benefit.Money, found bool, err error) benefit.AmountExtractor {
+	return func(benefit.EvaluationInput) (benefit.Money, bool, error) {
+		return money, found, err
+	}
+}
+
+func TestScopeConstraintMatching(t *testing.T) {
+	tests := []struct {
+		name   string
+		params benefit.ScopeConstraintParams
+		values []string
+		want   benefit.ConstraintDecisionCode
+	}{
+		{"default any", benefit.ScopeConstraintParams{Values: []string{"P1"}}, []string{"P2", "P1"}, benefit.ConstraintDecisionSatisfied},
+		{"all", benefit.ScopeConstraintParams{Values: []string{"P1", "P2"}, Match: benefit.ScopeMatchAll}, []string{"P1", "P2"}, benefit.ConstraintDecisionSatisfied},
+		{"all rejects one mismatch", benefit.ScopeConstraintParams{Values: []string{"P1"}, Match: benefit.ScopeMatchAll}, []string{"P1", "P2"}, benefit.ConstraintDecisionUnsatisfied},
+		{"empty extracted scope", benefit.ScopeConstraintParams{Values: []string{"P1"}}, nil, benefit.ConstraintDecisionUnsatisfied},
+		{"empty allow list", benefit.ScopeConstraintParams{}, []string{"P1"}, benefit.ConstraintDecisionInvalid},
+		{"blank allow list", benefit.ScopeConstraintParams{Values: []string{" "}}, []string{"P1"}, benefit.ConstraintDecisionInvalid},
+		{"invalid match", benefit.ScopeConstraintParams{Values: []string{"P1"}, Match: "none"}, []string{"P1"}, benefit.ConstraintDecisionInvalid},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			evaluator := benefit.NewScopeConstraintEvaluator(func(benefit.EvaluationInput) ([]string, error) {
+				return test.values, nil
+			})
+			decision, err := evaluator.Evaluate(
+				context.Background(),
+				mustConstraint(t, "test.scope", test.params),
+				benefit.EvaluationInput{},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if decision.Code != test.want {
+				t.Fatalf("got decision %#v, want code %q", decision, test.want)
+			}
+		})
+	}
+}
+
+func TestScopeConstraintEvaluatorErrors(t *testing.T) {
+	constraint := mustConstraint(t, "test.scope", benefit.ScopeConstraintParams{Values: []string{"P1"}})
+	valid := benefit.NewScopeConstraintEvaluator(func(benefit.EvaluationInput) ([]string, error) {
+		return []string{"P1"}, nil
+	})
+	extractorError := benefit.NewScopeConstraintEvaluator(func(benefit.EvaluationInput) ([]string, error) {
+		return nil, errors.New("extract failed")
+	})
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	tests := []struct {
+		name      string
+		ctx       context.Context
+		evaluator benefit.ConstraintEvaluator
+	}{
+		{"nil extractor", context.Background(), benefit.NewScopeConstraintEvaluator(nil)},
+		{"extractor error", context.Background(), extractorError},
+		{"cancelled context", cancelled, valid},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := test.evaluator.Evaluate(test.ctx, constraint, benefit.EvaluationInput{}); err == nil {
+				t.Fatal("scope evaluation unexpectedly succeeded")
+			}
+		})
+	}
+}
+
+func TestBuiltinConstraintValidation(t *testing.T) {
+	now := time.Date(2026, 8, 17, 10, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name       string
+		constraint benefit.Constraint
+		input      benefit.EvaluationInput
+	}{
+		{"empty time range", mustConstraint(t, benefit.ConstraintTimeRange, benefit.TimeRangeConstraintParams{}), benefit.EvaluationInput{}},
+		{"reversed time range", mustConstraint(t, benefit.ConstraintTimeRange, benefit.TimeRangeConstraintParams{StartsAt: now, ExpiresAt: now}), benefit.EvaluationInput{}},
+		{"empty weekdays", mustConstraint(t, benefit.ConstraintWeekday, benefit.WeekdayConstraintParams{}), benefit.EvaluationInput{}},
+		{"invalid weekday", mustConstraint(t, benefit.ConstraintWeekday, benefit.WeekdayConstraintParams{Weekdays: []time.Weekday{7}}), benefit.EvaluationInput{Now: now}},
+		{"invalid timezone", mustConstraint(t, benefit.ConstraintWeekday, benefit.WeekdayConstraintParams{Weekdays: []time.Weekday{time.Monday}, Timezone: "invalid/timezone"}), benefit.EvaluationInput{Now: now}},
+		{"zero redemption limit", mustConstraint(t, benefit.ConstraintRedemptionLimit, benefit.RedemptionLimitConstraintParams{}), benefit.EvaluationInput{}},
+		{"negative redeemed count", mustConstraint(t, benefit.ConstraintRedemptionLimit, benefit.RedemptionLimitConstraintParams{MaxCount: 1}), benefit.EvaluationInput{Benefit: benefit.BenefitInfo{Usage: benefit.Usage{RedeemedCount: -1}}}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			decision := benefit.DefaultConstraintRegistry.Evaluate(context.Background(), test.constraint, test.input)
+			if decision.Code != benefit.ConstraintDecisionInvalid {
+				t.Fatalf("got decision %#v, want invalid", decision)
+			}
+		})
 	}
 }
 

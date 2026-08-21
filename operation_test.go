@@ -87,6 +87,27 @@ func TestReverseOperationModes(t *testing.T) {
 	}
 }
 
+func TestOperationSupportsValidation(t *testing.T) {
+	tests := []struct {
+		name     string
+		supports benefit.OperationSupports
+	}{
+		{"empty operation", benefit.OperationSupports{{}}},
+		{"duplicate operation", benefit.OperationSupports{{Operation: "Archive"}, {Operation: "Archive"}}},
+		{"core operation", benefit.OperationSupports{{Operation: benefit.OperationInspect}}},
+		{"empty mode", benefit.OperationSupports{{Operation: "Archive", Modes: []benefit.OperationMode{""}}}},
+		{"duplicate mode", benefit.OperationSupports{{Operation: "Archive", Modes: []benefit.OperationMode{"manual", "manual"}}}},
+		{"invalid reverse mode", benefit.OperationSupports{{Operation: benefit.OperationReverse, Modes: []benefit.OperationMode{"manual"}}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.supports.Validate(); err == nil {
+				t.Fatal("invalid operation support unexpectedly validated")
+			}
+		})
+	}
+}
+
 func TestEffectiveOperationSupportsNarrowsPartialReverse(t *testing.T) {
 	declared := benefit.OperationSupports{
 		benefit.OperationSupport{
@@ -243,15 +264,33 @@ func TestEvaluateOperationDecisionStatuses(t *testing.T) {
 }
 
 func TestOperationDecisionRejectsInvalidStatusCombination(t *testing.T) {
-	decision := benefit.OperationDecision{
-		Operation: benefit.OperationReverse,
-		Status:    benefit.OperationDecisionStatusEligible,
-		Constraints: benefit.ConstraintReport{
-			Status: benefit.ConstraintReportStatusUnsatisfied,
+	tests := map[string]benefit.OperationDecision{
+		"empty operation": {Status: benefit.OperationDecisionStatusUnsupported},
+		"invalid status":  {Operation: benefit.OperationReverse, Status: "invalid"},
+		"unsupported with evaluated constraints": {
+			Operation: benefit.OperationReverse, Status: benefit.OperationDecisionStatusUnsupported,
+			Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusSatisfied},
+		},
+		"ineligible without violation": {
+			Operation: benefit.OperationReverse, Status: benefit.OperationDecisionStatusIneligible,
+			Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusSatisfied},
+		},
+		"eligible with violation": {
+			Operation: benefit.OperationReverse, Status: benefit.OperationDecisionStatusEligible,
+			Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusUnsatisfied},
+		},
+		"eligible with diagnostics": {
+			Operation: benefit.OperationReverse, Status: benefit.OperationDecisionStatusEligible,
+			Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusSatisfied},
+			Diagnostic:  benefit.Diagnostic{Reason: "unexpected"},
 		},
 	}
-	if err := decision.Validate(); err == nil {
-		t.Fatal("eligible operation with unsatisfied constraints unexpectedly validated")
+	for name, decision := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := decision.Validate(); err == nil {
+				t.Fatal("invalid operation decision unexpectedly validated")
+			}
+		})
 	}
 }
 
@@ -313,41 +352,90 @@ func TestResultStatusValidation(t *testing.T) {
 	if benefit.ResultStatusPending.IsFinal() || benefit.ResultStatusUnknown.IsFinal() {
 		t.Fatal("non-final result status was reported as final")
 	}
-	if err := (benefit.RedeemResult{Status: benefit.ResultStatusSuccess}).Validate(); err == nil {
-		t.Fatal("successful redeem without redemption unexpectedly validated")
+
+	redemption := &benefit.Redemption{RedemptionID: "R1"}
+	redeemFailure := &benefit.RedeemFailure{Code: benefit.RedeemFailureProviderRejected}
+	redeemTests := []struct {
+		name   string
+		result benefit.RedeemResult
+		valid  bool
+	}{
+		{"success", benefit.RedeemResult{Status: benefit.ResultStatusSuccess, Redemption: redemption}, true},
+		{"failure", benefit.RedeemResult{Status: benefit.ResultStatusFailure, Failure: redeemFailure}, true},
+		{"pending", benefit.RedeemResult{Status: benefit.ResultStatusPending}, true},
+		{"success without record", benefit.RedeemResult{Status: benefit.ResultStatusSuccess}, false},
+		{"success with failure", benefit.RedeemResult{Status: benefit.ResultStatusSuccess, Redemption: redemption, Failure: redeemFailure}, false},
+		{"failure without details", benefit.RedeemResult{Status: benefit.ResultStatusFailure}, false},
+		{"failure with record", benefit.RedeemResult{Status: benefit.ResultStatusFailure, Redemption: redemption, Failure: redeemFailure}, false},
+		{"pending with failure", benefit.RedeemResult{Status: benefit.ResultStatusPending, Failure: redeemFailure}, false},
+		{"unknown with record", benefit.RedeemResult{Status: benefit.ResultStatusUnknown, Redemption: redemption}, false},
+		{"invalid status", benefit.RedeemResult{Status: "invalid"}, false},
 	}
-	if err := (benefit.RedeemResult{
-		Status:  benefit.ResultStatusUnknown,
-		Failure: &benefit.RedeemFailure{Code: benefit.RedeemFailureProviderTimeout},
-	}).Validate(); err == nil {
-		t.Fatal("unknown redeem with confirmed failure unexpectedly validated")
+	for _, test := range redeemTests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.result.Validate(); (err == nil) != test.valid {
+				t.Fatalf("unexpected validation result: %v", err)
+			}
+		})
 	}
-	if err := (benefit.RedeemResult{
-		Status: benefit.ResultStatusSuccess,
-		Redemption: &benefit.Redemption{
-			RedemptionID: "R1",
-		},
-	}).Validate(); err != nil {
-		t.Fatalf("valid result failed: %v", err)
+
+	reversal := &benefit.Reversal{ReversalID: "RV1", RedemptionID: "R1"}
+	reverseFailure := &benefit.ReversalFailure{Code: benefit.ReversalFailureProviderRejected}
+	reverseTests := []struct {
+		name   string
+		result benefit.ReverseResult
+		valid  bool
+	}{
+		{"success", benefit.ReverseResult{Status: benefit.ResultStatusSuccess, Reversal: reversal}, true},
+		{"failure", benefit.ReverseResult{Status: benefit.ResultStatusFailure, Failure: reverseFailure}, true},
+		{"pending", benefit.ReverseResult{Status: benefit.ResultStatusPending}, true},
+		{"success without record", benefit.ReverseResult{Status: benefit.ResultStatusSuccess}, false},
+		{"success with failure", benefit.ReverseResult{Status: benefit.ResultStatusSuccess, Reversal: reversal, Failure: reverseFailure}, false},
+		{"failure without details", benefit.ReverseResult{Status: benefit.ResultStatusFailure}, false},
+		{"failure with record", benefit.ReverseResult{Status: benefit.ResultStatusFailure, Reversal: reversal, Failure: reverseFailure}, false},
+		{"pending with failure", benefit.ReverseResult{Status: benefit.ResultStatusPending, Failure: reverseFailure}, false},
+		{"unknown with record", benefit.ReverseResult{Status: benefit.ResultStatusUnknown, Reversal: reversal}, false},
+		{"invalid status", benefit.ReverseResult{Status: "invalid"}, false},
 	}
-	if err := (benefit.RedeemResult{
-		Status:     benefit.ResultStatusFailure,
-		Redemption: &benefit.Redemption{RedemptionID: "R1"},
-		Failure:    &benefit.RedeemFailure{Code: benefit.RedeemFailureProviderRejected},
-	}).Validate(); err == nil {
-		t.Fatal("failed redeem with redemption unexpectedly validated")
+	for _, test := range reverseTests {
+		t.Run("reverse "+test.name, func(t *testing.T) {
+			if err := test.result.Validate(); (err == nil) != test.valid {
+				t.Fatalf("unexpected validation result: %v", err)
+			}
+		})
 	}
-	if err := (benefit.RedeemResult{
-		Status: benefit.ResultStatusPending,
-		// ProviderOperationID: "JOB1",
-		// ProviderData:        `{"state":"queued"}`,
-	}).Validate(); err != nil {
-		t.Fatalf("valid pending redeem result failed: %v", err)
+}
+
+func TestMutationRecordValidation(t *testing.T) {
+	redemptions := []struct {
+		name   string
+		record benefit.Redemption
+	}{
+		{"without id", benefit.Redemption{}},
+		{"with invalid outcome", benefit.Redemption{RedemptionID: "R1", Outcome: benefit.BenefitOutcome{Discount: &benefit.DiscountEffect{Type: "invalid"}}}},
 	}
-	if err := (benefit.ReverseResult{
-		Status:   benefit.ResultStatusUnknown,
-		Reversal: &benefit.Reversal{ReversalID: "RV1", RedemptionID: "R1"},
-	}).Validate(); err == nil {
-		t.Fatal("unknown reverse with reversal unexpectedly validated")
+	for _, test := range redemptions {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.record.Validate(); err == nil {
+				t.Fatal("invalid record unexpectedly validated")
+			}
+		})
+	}
+
+	reversals := []struct {
+		name   string
+		record benefit.Reversal
+	}{
+		{"without id", benefit.Reversal{RedemptionID: "R1"}},
+		{"without redemption id", benefit.Reversal{ReversalID: "RV1"}},
+		{"with invalid currency", benefit.Reversal{ReversalID: "RV1", RedemptionID: "R1", RestoredAmount: benefit.Money{Amount: 1}}},
+		{"with negative amount", benefit.Reversal{ReversalID: "RV1", RedemptionID: "R1", RestoredAmount: benefit.Money{Amount: -1, Currency: "USD"}}},
+	}
+	for _, test := range reversals {
+		t.Run("reversal "+test.name, func(t *testing.T) {
+			if err := test.record.Validate(); err == nil {
+				t.Fatal("invalid record unexpectedly validated")
+			}
+		})
 	}
 }
