@@ -72,9 +72,9 @@ type BenefitReference struct {
 // Evaluators must treat the input and all values reachable from it as immutable
 // and must not retain them after Evaluate returns.
 type EvaluationInput struct {
-	Benefit BenefitInfo      `json:"benefit"`
-	Context OperationContext `json:"-"`
-	Now     time.Time        `json:"now,omitzero"`
+	Benefit BenefitInfo `json:"benefit"`
+	Input   DriverInput `json:"-"`
+	Now     time.Time   `json:"now,omitzero"`
 }
 
 func (in *EvaluationInput) evaluationTime() time.Time {

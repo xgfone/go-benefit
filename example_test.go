@@ -22,7 +22,7 @@ type exampleConfig struct {
 	DiscountAmount int64  `json:"discount_amount"`
 }
 
-type exampleUseContext struct {
+type exampleUseInput struct {
 	MerchantID string
 	Amount     benefit.Money
 }
@@ -147,17 +147,17 @@ func parseExampleConfig(raw benefit.DriverConfig) (exampleConfig, error) {
 }
 
 func extractExampleAmount(input benefit.EvaluationInput) (benefit.Money, bool, error) {
-	facts, ok := input.Context.(exampleUseContext)
+	facts, ok := input.Input.(exampleUseInput)
 	if !ok {
-		return benefit.Money{}, false, fmt.Errorf("unexpected operation context type %T", input.Context)
+		return benefit.Money{}, false, fmt.Errorf("unexpected driver input type %T", input.Input)
 	}
 	return facts.Amount, true, nil
 }
 
 func extractExampleMerchant(input benefit.EvaluationInput) ([]string, error) {
-	facts, ok := input.Context.(exampleUseContext)
+	facts, ok := input.Input.(exampleUseInput)
 	if !ok {
-		return nil, fmt.Errorf("unexpected operation context type %T", input.Context)
+		return nil, fmt.Errorf("unexpected driver input type %T", input.Input)
 	}
 	return []string{facts.MerchantID}, nil
 }
@@ -208,15 +208,15 @@ func (d *exampleCouponDriver) Evaluate(
 
 	result, err := benefit.EvaluateLocalEligibility(ctx, d.constraintRegistry, benefit.EvaluationInput{
 		Benefit: info,
-		Context: request.Context,
+		Input:   request.Input,
 	})
 	if err != nil || !result.Eligible {
 		return result, err
 	}
 
-	facts, ok := request.Context.(exampleUseContext)
+	facts, ok := request.Input.(exampleUseInput)
 	if !ok {
-		return benefit.EvaluationResult{}, fmt.Errorf("unexpected operation context type %T", request.Context)
+		return benefit.EvaluationResult{}, fmt.Errorf("unexpected driver input type %T", request.Input)
 	}
 	discountAmount := min(d.config.DiscountAmount, facts.Amount.Amount)
 	result.Outcome = benefit.BenefitOutcome{Discount: &benefit.DiscountEffect{
@@ -248,7 +248,7 @@ func (d *exampleCouponDriver) Redeem(
 
 	evaluation, err := d.Evaluate(ctx, benefit.EvaluateRequest{
 		Reference: request.Reference,
-		Context:   request.Context,
+		Input:     request.Input,
 	})
 	if err != nil {
 		return benefit.RedeemResult{}, err
@@ -325,14 +325,14 @@ func Example() {
 		panic(err)
 	}
 	reference := benefit.BenefitReference{Value: "COUPON-001"}
-	operationContext := exampleUseContext{
+	driverInput := exampleUseInput{
 		MerchantID: "merchant-1",
 		Amount:     benefit.Money{Amount: 10000, Currency: "CNY"},
 	}
 
 	info, err := driver.Inspect(ctx, benefit.InspectRequest{
 		Reference: reference,
-		Context:   operationContext,
+		Input:     driverInput,
 	})
 	if err != nil {
 		panic(err)
@@ -341,7 +341,7 @@ func Example() {
 
 	evaluation, err := driver.Evaluate(ctx, benefit.EvaluateRequest{
 		Reference: reference,
-		Context:   operationContext,
+		Input:     driverInput,
 	})
 	if err != nil {
 		panic(err)
@@ -360,7 +360,7 @@ func Example() {
 		RedemptionID:    "redeem-1",
 		EvaluationToken: evaluation.EvaluationToken,
 		Reference:       reference,
-		Context:         operationContext,
+		Input:           driverInput,
 	})
 	if err != nil {
 		panic(err)
@@ -379,7 +379,7 @@ func Example() {
 		ReversalID:   "reverse-1",
 		RedemptionID: redeemResult.Redemption.RedemptionID,
 		Reason:       "order cancelled",
-		Context:      operationContext,
+		Input:        driverInput,
 	})
 	if err != nil {
 		panic(err)

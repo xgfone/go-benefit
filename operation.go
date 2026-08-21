@@ -7,11 +7,6 @@ import (
 	"slices"
 )
 
-// OperationContext contains optional application-defined, in-process facts.
-// Callers, drivers, and constraint evaluators must treat the contained value
-// as immutable and must not retain it beyond the operation call.
-type OperationContext any
-
 // Operation identifies a driver operation.
 type Operation string
 

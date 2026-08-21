@@ -117,16 +117,23 @@ type Reverser interface {
 	Reverse(ctx context.Context, req ReverseRequest) (result ReverseResult, err error)
 }
 
+// DriverInput contains optional application-defined input supplied for one
+// Driver call. The caller and Driver implementation agree on its dynamic type.
+// Callers, drivers, and constraint evaluators must treat the contained value
+// and all values reachable from it as immutable and must not retain them beyond
+// the Driver call.
+type DriverInput any
+
 // InspectRequest identifies the benefit to inspect.
 type InspectRequest struct {
 	Reference BenefitReference `json:"-"`
-	Context   OperationContext `json:"-"`
+	Input     DriverInput      `json:"-"`
 }
 
-// EvaluateRequest evaluates a benefit against one operation context.
+// EvaluateRequest evaluates a benefit against one driver input.
 type EvaluateRequest struct {
 	Reference BenefitReference `json:"-"`
-	Context   OperationContext `json:"-"`
+	Input     DriverInput      `json:"-"`
 }
 
 // RedeemRequest performs one uniquely identified redeem operation. Callers
@@ -142,7 +149,7 @@ type RedeemRequest struct {
 	EvaluationToken string `json:"evaluation_token,omitempty"`
 
 	Reference BenefitReference `json:"-"`
-	Context   OperationContext `json:"-"`
+	Input     DriverInput      `json:"-"`
 }
 
 // ReverseRequest performs one uniquely identified reversal of a confirmed
@@ -156,5 +163,5 @@ type ReverseRequest struct {
 	RedemptionID string `json:"redemption_id"`
 	Reason       string `json:"reason,omitempty"`
 
-	Context OperationContext `json:"-"`
+	Input DriverInput `json:"-"`
 }

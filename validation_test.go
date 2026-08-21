@@ -102,18 +102,18 @@ func TestModelsOmitZeroValues(t *testing.T) {
 }
 
 func TestRequestValidation(t *testing.T) {
-	operationContext := struct {
+	driverInput := struct {
 		UserID string `json:"user_id"`
 	}{UserID: "U1"}
 
 	if err := (benefit.RedeemRequest{
-		Context: operationContext,
+		Input: driverInput,
 	}).Validate(); err == nil {
 		t.Fatal("redeem request without a redemption id unexpectedly validated")
 	}
 	if err := (benefit.RedeemRequest{
 		RedemptionID: "R1",
-		Context:      operationContext,
+		Input:        driverInput,
 	}).Validate(); err != nil {
 		t.Fatalf("valid redeem request failed: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestRequestJSONOmitsInProcessValues(t *testing.T) {
 	request := benefit.RedeemRequest{
 		RedemptionID: "R1",
 		Reference:    benefit.BenefitReference{Value: "BEARER-CODE"},
-		Context: struct {
+		Input: struct {
 			MerchantID string
 		}{MerchantID: "M1"},
 	}

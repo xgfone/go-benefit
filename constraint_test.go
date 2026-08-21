@@ -126,12 +126,12 @@ func TestExtractedAmountAndScopeConstraints(t *testing.T) {
 		Values: []string{"P1", "P2"},
 		Match:  benefit.ScopeMatchAny,
 	})
-	operationContext := testOperationContext{
+	driverInput := testDriverInput{
 		Amount:   benefit.Money{Amount: 12000, Currency: "CNY"},
 		Products: []string{"P9", "P2"},
 	}
 	input := benefit.EvaluationInput{
-		Context: operationContext,
+		Input: driverInput,
 	}
 	registry := benefit.NewConstraintRegistry()
 	if err := registry.Register(
@@ -156,7 +156,7 @@ func TestExtractedAmountAndScopeConstraints(t *testing.T) {
 		t.Fatalf("constraints unexpectedly failed: %#v", report.Violations)
 	}
 
-	input.Context = testOperationContext{Products: []string{"P9"}}
+	input.Input = testDriverInput{Products: []string{"P9"}}
 	report = registry.EvaluateAll(context.Background(), input, benefit.Constraints{products})
 	if report.IsSatisfied() || len(report.Violations) != 1 {
 		t.Fatalf("out-of-scope product unexpectedly satisfied: %#v", report)
@@ -175,10 +175,10 @@ func TestAmountConstraintRejectsCurrencyMismatch(t *testing.T) {
 		Amount:   100,
 		Currency: "USD",
 	})
-	operationContext := testOperationContext{
+	driverInput := testDriverInput{
 		Amount: benefit.Money{Amount: 10000, Currency: "CNY"},
 	}
-	input := benefit.EvaluationInput{Context: operationContext}
+	input := benefit.EvaluationInput{Input: driverInput}
 	registry := benefit.NewConstraintRegistry()
 	if err := registry.Register(
 		benefit.ConstraintMinimumAmount,
@@ -387,23 +387,23 @@ func TestTimeWeekdayAndRedemptionLimitConstraints(t *testing.T) {
 	}
 }
 
-type testOperationContext struct {
+type testDriverInput struct {
 	Amount   benefit.Money `json:"amount"`
 	Products []string      `json:"products,omitempty"`
 }
 
 func extractTestAmount(input benefit.EvaluationInput) (benefit.Money, bool, error) {
-	facts, ok := input.Context.(testOperationContext)
+	facts, ok := input.Input.(testDriverInput)
 	if !ok {
-		return benefit.Money{}, false, fmt.Errorf("unexpected operation context type %T", input.Context)
+		return benefit.Money{}, false, fmt.Errorf("unexpected driver input type %T", input.Input)
 	}
 	return facts.Amount, true, nil
 }
 
 func extractTestProducts(input benefit.EvaluationInput) ([]string, error) {
-	facts, ok := input.Context.(testOperationContext)
+	facts, ok := input.Input.(testDriverInput)
 	if !ok {
-		return nil, fmt.Errorf("unexpected operation context type %T", input.Context)
+		return nil, fmt.Errorf("unexpected driver input type %T", input.Input)
 	}
 	return facts.Products, nil
 }

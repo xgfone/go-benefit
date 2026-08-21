@@ -58,9 +58,10 @@ or provider record ID. It is not a provider API credential and is excluded from
 default JSON serialization. Applications should authenticate requests and
 resolve device, merchant, or user facts before constructing driver requests.
 
-`OperationContext` carries application-defined, in-process facts. The core
-package does not prescribe merchant, store, product, user, quantity, or payment
-fields and performs no JSON round trip. Callers, drivers, and constraint
+`DriverInput` carries application-defined, in-process input for one driver call.
+The core package does not prescribe merchant, store, product, user, quantity,
+or payment fields and performs no JSON round trip. The caller and driver
+implementation agree on its dynamic type. Callers, drivers, and constraint
 evaluators must treat the value and everything reachable from it as immutable
 and must not retain it after the call.
 
@@ -119,7 +120,7 @@ it never embeds the original definition. Human-facing constraint information
 belongs in `Notice` instead.
 
 Drivers should model fixed filters compiled from `DriverConfig` and per-call
-facts extracted from `OperationContext` with the same constraint mechanism. A
+facts extracted from `DriverInput` with the same constraint mechanism. A
 driver should return a merchant, store, or product mismatch as a
 `constraint.unsatisfied` business result, not as an unsupported operation.
 
