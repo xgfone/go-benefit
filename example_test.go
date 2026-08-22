@@ -68,10 +68,7 @@ func (exampleDriverDefinition) ConfigSchema() benefit.ConfigSchema {
 	}
 }
 
-func (exampleDriverDefinition) ValidateConfig(ctx context.Context, raw benefit.DriverConfig) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
+func (exampleDriverDefinition) ValidateConfig(raw benefit.DriverConfig) error {
 	_, err := parseExampleConfig(raw)
 	return err
 }
@@ -120,13 +117,12 @@ func (exampleDriverDefinition) CompileConfig(raw benefit.DriverConfig) (benefit.
 		return nil, err
 	}
 
-	return benefit.DriverFactoryFunc(func() (benefit.Driver, error) {
-		return &exampleCouponDriver{
-			config:             config,
-			constraints:        constraints,
-			constraintRegistry: constraintRegistry,
-		}, nil
-	}), nil
+	driver := &exampleCouponDriver{
+		config:             config,
+		constraints:        constraints,
+		constraintRegistry: constraintRegistry,
+	}
+	return func() benefit.Driver { return driver }, nil
 }
 
 func parseExampleConfig(raw benefit.DriverConfig) (exampleConfig, error) {
@@ -316,7 +312,7 @@ func Example() {
 		"minimum_amount":10000,
 		"discount_amount":2000
 	}`)
-	if err := registry.ValidateConfig(ctx, exampleDriverType, config); err != nil {
+	if err := registry.ValidateConfig(exampleDriverType, config); err != nil {
 		panic(err)
 	}
 

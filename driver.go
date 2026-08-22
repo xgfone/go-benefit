@@ -78,12 +78,19 @@ type DriverDefinition interface {
 	// ConfigSchema must return an equivalent schema on every call.
 	ConfigSchema() ConfigSchema
 
-	ValidateConfig(ctx context.Context, conf DriverConfig) (err error)
+	// ValidateConfig validates config without compiling it. It must accept a
+	// configuration if and only if CompileConfig accepts it, must not retain
+	// config or populate compilation caches, and must not depend on network
+	// or time. Implementations should share parsing and validation logic
+	// with CompileConfig.
+	ValidateConfig(conf DriverConfig) (err error)
 
 	// CompileConfig validates, parses, and compiles config independently
 	// of ValidateConfig, which DriverRegistry.Bind does not call. It is
 	// a deterministic, local operation: equal configurations must produce
 	// equivalent factories or errors without network or time dependencies.
+	// Implementations and proxies may cache and reuse compiled factories
+	// or drivers for equal configurations.
 	//
 	// Implementations must be safe for concurrent use.
 	CompileConfig(conf DriverConfig) (factory DriverFactory, err error)

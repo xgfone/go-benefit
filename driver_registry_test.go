@@ -29,14 +29,12 @@ func TestDriverRegistry(t *testing.T) {
 	}
 
 	if err := registry.ValidateConfig(
-		context.Background(),
 		"test.coupon",
 		benefit.DriverConfig(`{}`),
 	); err == nil {
 		t.Fatal("invalid driver config unexpectedly validated")
 	}
 	if err := registry.ValidateConfig(
-		context.Background(),
 		"test.coupon",
 		validDriverConfig,
 	); err != nil {
@@ -57,11 +55,11 @@ func TestDriverRegistry(t *testing.T) {
 	if definition.validateCalls.Load() != validateCalls {
 		t.Fatal("binding unexpectedly performed management configuration validation")
 	}
-	if definition.compileCalls.Load() != 1 || definition.newDriverCalls.Load() != 1 {
+	if definition.compileCalls.Load() != 1 || definition.factoryCalls.Load() != 1 {
 		t.Fatalf(
-			"unexpected compile or construction calls: compile=%d new=%d",
+			"unexpected compile or factory calls: compile=%d factory=%d",
 			definition.compileCalls.Load(),
-			definition.newDriverCalls.Load(),
+			definition.factoryCalls.Load(),
 		)
 	}
 
@@ -197,8 +195,24 @@ func TestNilDriverRegistryAndFactory(t *testing.T) {
 	if err := benefit.NewDriverRegistry().Register(nil); err == nil {
 		t.Fatal("nil driver definition unexpectedly registered")
 	}
-	if _, err := (benefit.DriverFactoryFunc(nil)).NewDriver(); err == nil {
-		t.Fatal("nil driver factory function unexpectedly constructed a driver")
+	definition := newFakeDefinition("nil_factory", false, false)
+	definition.nilFactory = true
+	registry = benefit.NewDriverRegistry()
+	if err := registry.Register(definition); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registry.Bind("test.nil_factory", validDriverConfig); err == nil {
+		t.Fatal("nil driver factory unexpectedly bound a driver")
+	}
+
+	definition = newFakeDefinition("nil_driver", false, false)
+	definition.nilDriver = true
+	registry = benefit.NewDriverRegistry()
+	if err := registry.Register(definition); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registry.Bind("test.nil_driver", validDriverConfig); err == nil {
+		t.Fatal("factory returning a nil driver unexpectedly bound")
 	}
 }
 
@@ -210,7 +224,6 @@ func TestRequiredDriverConfigRejectsEmpty(t *testing.T) {
 	}
 
 	if err := registry.ValidateConfig(
-		context.Background(),
 		"test.required_config",
 		"",
 	); err == nil {
@@ -219,8 +232,8 @@ func TestRequiredDriverConfigRejectsEmpty(t *testing.T) {
 	if _, err := registry.Bind("test.required_config", ""); err == nil {
 		t.Fatal("empty required configuration unexpectedly bound")
 	}
-	if definition.validateCalls.Load() != 0 || definition.compileCalls.Load() != 0 {
-		t.Fatal("empty required configuration reached the driver definition")
+	if definition.validateCalls.Load() != 1 || definition.compileCalls.Load() != 1 {
+		t.Fatal("driver definition did not authoritatively reject empty configuration")
 	}
 }
 
@@ -242,7 +255,6 @@ func TestOptionalDriverConfig(t *testing.T) {
 	}
 
 	if err := registry.ValidateConfig(
-		context.Background(),
 		"test.optional_config",
 		"",
 	); err != nil {
@@ -253,12 +265,12 @@ func TestOptionalDriverConfig(t *testing.T) {
 	}
 	if definition.validateCalls.Load() != 1 ||
 		definition.compileCalls.Load() != 1 ||
-		definition.newDriverCalls.Load() != 1 {
+		definition.factoryCalls.Load() != 1 {
 		t.Fatalf(
-			"unexpected optional config calls: validate=%d compile=%d new=%d",
+			"unexpected optional config calls: validate=%d compile=%d factory=%d",
 			definition.validateCalls.Load(),
 			definition.compileCalls.Load(),
-			definition.newDriverCalls.Load(),
+			definition.factoryCalls.Load(),
 		)
 	}
 }
@@ -302,9 +314,11 @@ type fakeDefinition struct {
 	driverHasReverse     bool
 	declareCoreOperation benefit.Operation
 	schema               benefit.ConfigSchema
+	nilFactory           bool
+	nilDriver            bool
 	validateCalls        atomic.Int64
 	compileCalls         atomic.Int64
-	newDriverCalls       atomic.Int64
+	factoryCalls         atomic.Int64
 }
 
 func newFakeDefinition(kind string, declareReverse, driverHasReverse bool) *fakeDefinition {
@@ -354,7 +368,7 @@ func (d *fakeDefinition) ConfigSchema() benefit.ConfigSchema {
 	return d.schema.Clone()
 }
 
-func (d *fakeDefinition) ValidateConfig(_ context.Context, config benefit.DriverConfig) error {
+func (d *fakeDefinition) ValidateConfig(config benefit.DriverConfig) error {
 	d.validateCalls.Add(1)
 	if config.IsZero() && d.schema.Optional {
 		return nil
@@ -370,16 +384,22 @@ func (d *fakeDefinition) CompileConfig(config benefit.DriverConfig) (benefit.Dri
 			return nil, err
 		}
 	}
+	if d.nilFactory {
+		return nil, nil
+	}
 
 	descriptor := d.Descriptor()
-	return benefit.DriverFactoryFunc(func() (benefit.Driver, error) {
-		d.newDriverCalls.Add(1)
+	return func() benefit.Driver {
+		d.factoryCalls.Add(1)
+		if d.nilDriver {
+			return nil
+		}
 		core := fakeDriverCore{descriptor: descriptor}
 		if d.driverHasReverse {
-			return &fakeDriver{fakeDriverCore: core}, nil
+			return &fakeDriver{fakeDriverCore: core}
 		}
-		return &core, nil
-	}), nil
+		return &core
+	}, nil
 }
 
 type fakeConfig struct {

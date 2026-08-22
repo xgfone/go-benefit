@@ -1,7 +1,6 @@
 package benefit
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -127,19 +126,16 @@ func (r *DriverRegistry) getDescriptors() []DriverDescriptor {
 }
 
 // ValidateConfig validates configuration before a driver instance is persisted.
-func (r *DriverRegistry) ValidateConfig(ctx context.Context, driverType DriverType, config DriverConfig) error {
+func (r *DriverRegistry) ValidateConfig(driverType DriverType, config DriverConfig) error {
 	registered, ok := r.get(driverType)
 	if !ok {
 		return fmt.Errorf("benefit: driver type %q is not registered", driverType)
 	}
 
-	if err := validateDriverConfigPresence(registered.schema, config); err != nil {
-		return err
-	}
 	if err := config.Validate(); err != nil {
 		return err
 	}
-	if err := registered.definition.ValidateConfig(ctx, config); err != nil {
+	if err := registered.definition.ValidateConfig(config); err != nil {
 		return fmt.Errorf("benefit: validate driver %q config: %w", driverType, err)
 	}
 
@@ -153,7 +149,7 @@ func (r *DriverRegistry) Bind(driverType DriverType, config DriverConfig) (Drive
 		return nil, fmt.Errorf("benefit: driver type %q is not registered", driverType)
 	}
 
-	if err := validateDriverConfigPresence(registered.schema, config); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -165,11 +161,7 @@ func (r *DriverRegistry) Bind(driverType DriverType, config DriverConfig) (Drive
 		return nil, fmt.Errorf("benefit: driver definition %q returned a nil factory", driverType)
 	}
 
-	driver, err := factory.NewDriver()
-	if err != nil {
-		return nil, fmt.Errorf("benefit: bind driver %q: %w", driverType, err)
-	}
-
+	driver := factory()
 	if driver == nil {
 		return nil, fmt.Errorf("benefit: driver factory %q returned nil", driverType)
 	}
@@ -201,13 +193,6 @@ func validateDriverOperation[T any](driver Driver, op Operation) error {
 	return fmt.Errorf(msg, driver.Descriptor().Type, OperationReverse)
 }
 
-func validateDriverConfigPresence(schema ConfigSchema, config DriverConfig) error {
-	if config.IsZero() && !schema.Optional {
-		return errors.New("benefit: driver config is required")
-	}
-	return nil
-}
-
 func cloneDriverDescriptor(descriptor DriverDescriptor) DriverDescriptor {
 	descriptor.Operations = cloneOperationCapabilities(descriptor.Operations)
 	return descriptor
@@ -222,8 +207,8 @@ func RegisterDriver(definition DriverDefinition) error {
 }
 
 // ValidateDriverConfig validates configuration with the package-level registry.
-func ValidateDriverConfig(ctx context.Context, driverType DriverType, config DriverConfig) error {
-	return DefaultDriverRegistry.ValidateConfig(ctx, driverType, config)
+func ValidateDriverConfig(driverType DriverType, config DriverConfig) error {
+	return DefaultDriverRegistry.ValidateConfig(driverType, config)
 }
 
 // BindDriver constructs a driver from the package-level registry.

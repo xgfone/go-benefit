@@ -42,14 +42,18 @@ Management applications use `ConfigSchema` to render configuration forms and
 call `ValidateConfig` before encrypting and persisting operator input. A
 `DriverConfig` is either empty, when the schema permits it, or a UTF-8 JSON
 object. Schemas use JSON Schema Draft 2020-12 and may include UI extensions such
-as `x-secret`. Runtime binding does not call management validation again, so
-`CompileConfig` must independently validate and parse persisted configuration.
+as `x-secret`. `DriverDefinition.ValidateConfig` is authoritative and must agree
+with `CompileConfig`; it is side-effect free and does not populate compilation
+caches. Runtime binding does not call management validation again, so
+`CompileConfig` independently validates and parses persisted configuration.
 
 At runtime, `DriverRegistry.Bind` calls deterministic, local `CompileConfig`
-and creates a new lightweight driver. The resulting driver has provider
-credentials and fixed matching rules already bound, so operation calls do not
-repeatedly receive sensitive configuration. Implementations must make compiled
-factories and bound drivers safe for concurrent use.
+and obtains a driver from the resulting `DriverFactory`. Definitions and proxies
+may cache factories for equal configurations, and a factory may return the same
+driver or different lightweight drivers across calls. The resulting driver has
+provider credentials and fixed matching rules already bound, so operation calls
+do not repeatedly receive sensitive configuration. Compiled factories and bound
+drivers must be safe for concurrent use.
 
 ## Operation inputs and behavior
 

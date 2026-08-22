@@ -45,7 +45,8 @@ func (c DriverConfig) Validate() error {
 	return nil
 }
 
-// ConfigSchema describes a versioned driver configuration contract.
+// ConfigSchema describes versioned configuration form and validation metadata.
+// DriverDefinition validation and compilation remain authoritative.
 type ConfigSchema struct {
 	Revision string          `json:"revision"`
 	Optional bool            `json:"optional,omitempty"`
@@ -97,20 +98,7 @@ func (s ConfigSchema) Validate() error {
 	return nil
 }
 
-// DriverFactory creates lightweight drivers from one compiled configuration.
-// Implementations must treat their compiled configuration as immutable, allow
-// concurrent calls, and return a new driver from each NewDriver call.
-type DriverFactory interface {
-	NewDriver() (Driver, error)
-}
-
-// DriverFactoryFunc adapts a function to DriverFactory.
-type DriverFactoryFunc func() (Driver, error)
-
-// NewDriver implements the interface DriverFactory.
-func (f DriverFactoryFunc) NewDriver() (Driver, error) {
-	if f == nil {
-		return nil, errors.New("benefit: driver factory function is nil")
-	}
-	return f()
-}
+// DriverFactory returns a driver from one compiled configuration. It must be
+// safe for concurrent calls and may return the same or different concurrently
+// safe Driver instances across calls.
+type DriverFactory func() Driver
