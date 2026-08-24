@@ -6,6 +6,11 @@ import (
 	"fmt"
 )
 
+// ErrBenefitNotFound reports that an Inspect reference did not resolve to a
+// benefit. Evaluate and Redeem implementations must translate the same
+// confirmed provider outcome into their operation-specific failure results.
+var ErrBenefitNotFound = errors.New("benefit: benefit not found")
+
 // DriverType identifies a provider-specific benefit kind.
 type DriverType string
 
@@ -104,8 +109,10 @@ type DriverDefinition interface {
 // without an EvaluationToken, and must check current eligibility even when an
 // earlier Evaluate call returned an eligible result.
 //
-// Business rejection belongs in result values. Go errors are reserved for
-// local invocation failures that do not describe a confirmed provider outcome.
+// Confirmed business outcomes from Evaluate, Redeem, and Reverse belong in
+// result values. Inspect may return documented lookup errors such as
+// ErrBenefitNotFound. Other Go errors are reserved for local invocation or
+// integration failures that do not describe a confirmed provider outcome.
 // Implementations must be safe for concurrent operation calls.
 type Driver interface {
 	// Descriptor returns the global, configuration-independent metadata of

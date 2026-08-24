@@ -175,19 +175,15 @@ func (d *exampleCouponDriver) Inspect(
 	if err := ctx.Err(); err != nil {
 		return benefit.BenefitInfo{}, err
 	}
-
-	status := benefit.StatusActive
-	providerBenefitId := "provider-coupon-1"
 	if request.Reference.Value != "COUPON-001" {
-		status = benefit.StatusUnknown
-		providerBenefitId = ""
+		return benefit.BenefitInfo{}, benefit.ErrBenefitNotFound
 	}
 
 	return benefit.BenefitInfo{
-		ProviderBenefitId: providerBenefitId,
+		ProviderBenefitId: "provider-coupon-1",
 		DriverType:        exampleDriverType,
 		Name:              "CNY 20 coupon",
-		Status:            status,
+		Status:            benefit.StatusActive,
 		Usage:             benefit.Usage{RemainingCount: 1},
 		Constraints:       append(benefit.Constraints(nil), d.constraints...),
 	}, nil
@@ -198,6 +194,17 @@ func (d *exampleCouponDriver) Evaluate(
 	request benefit.EvaluateRequest,
 ) (benefit.EvaluationResult, error) {
 	info, err := d.Inspect(ctx, benefit.InspectRequest(request))
+	if errors.Is(err, benefit.ErrBenefitNotFound) {
+		return benefit.EvaluationResult{
+			Eligible: false,
+			Failure: &benefit.EvaluationFailure{
+				Code: benefit.EvaluationFailureBenefitNotFound,
+			},
+			Constraints: benefit.ConstraintReport{
+				Status: benefit.ConstraintReportStatusUnevaluated,
+			},
+		}, nil
+	}
 	if err != nil {
 		return benefit.EvaluationResult{}, err
 	}

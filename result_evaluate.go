@@ -10,9 +10,14 @@ import (
 type EvaluationFailureCode string
 
 const (
+	// EvaluationFailureBenefitNotFound means the supplied reference did not
+	// resolve to a benefit.
+	EvaluationFailureBenefitNotFound EvaluationFailureCode = "benefit.not_found"
+
 	// EvaluationFailureBenefitInactive means the benefit is not currently
 	// in the active lifecycle state.
-	EvaluationFailureBenefitInactive       EvaluationFailureCode = "benefit.inactive"
+	EvaluationFailureBenefitInactive EvaluationFailureCode = "benefit.inactive"
+
 	EvaluationFailureConstraintUnsatisfied EvaluationFailureCode = "constraint.unsatisfied"
 )
 

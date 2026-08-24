@@ -36,7 +36,7 @@ type StatusFacts struct {
 // ResolveStatus applies business-terminal precedence before time-derived state.
 func ResolveStatus(facts StatusFacts, now time.Time) Status {
 	switch facts.ProviderStatus {
-	case StatusVoided, StatusSuspended, StatusExhausted:
+	case StatusVoided, StatusSuspended, StatusExhausted, StatusExpired:
 		return facts.ProviderStatus
 	}
 
@@ -51,7 +51,7 @@ func ResolveStatus(facts StatusFacts, now time.Time) Status {
 	}
 
 	switch facts.ProviderStatus {
-	case StatusPending, StatusActive, StatusExpired:
+	case StatusPending, StatusActive:
 		return facts.ProviderStatus
 
 	default:

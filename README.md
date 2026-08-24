@@ -73,13 +73,17 @@ and must not retain it after the call.
 driver; provider and kind metadata come from its `DriverDescriptor`.
 `ProviderBenefitId` is optional and must not contain a bearer secret. Drivers map
 raw provider states to normalized `Status` values and may retain non-standard
-diagnostics in opaque `ProviderData`.
+diagnostics in opaque `ProviderData`. When a reference does not resolve to a
+benefit, `Inspect` returns `ErrBenefitNotFound` and no `BenefitInfo`. This lookup
+outcome is not a benefit lifecycle status.
 
 `Evaluate` is a non-consuming quote or preflight. It is useful for displaying a
 projected outcome and for preparing a multi-benefit plan, but callers never have
 to call it before `Redeem`. `Redeem` is authoritative, accepts an empty
 `EvaluationToken`, and must recheck current status, provider matching, and all
-constraints even when an earlier evaluation was eligible.
+constraints even when an earlier evaluation was eligible. A confirmed missing
+benefit is represented by `EvaluationFailureBenefitNotFound` from `Evaluate`
+and `RedeemFailureBenefitNotFound` from `Redeem`, not by a Go error.
 
 `DriverDescriptor.Operations` declares the driver type's maximum optional
 `OperationCapabilities`. Presence means supported; there is no separate

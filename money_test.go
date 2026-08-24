@@ -195,6 +195,14 @@ func TestResolveStatusPrecedence(t *testing.T) {
 			want: benefit.StatusExpired,
 		},
 		{
+			name: "provider expired wins over future validity",
+			facts: benefit.StatusFacts{
+				ProviderStatus: benefit.StatusExpired,
+				Validity:       benefit.Validity{StartsAt: future},
+			},
+			want: benefit.StatusExpired,
+		},
+		{
 			name:  "provider active remains active",
 			facts: benefit.StatusFacts{ProviderStatus: benefit.StatusActive},
 			want:  benefit.StatusActive,
