@@ -4,7 +4,7 @@ import "context"
 
 // RedemptionLimitConstraintParams sets the maximum cumulative redemption count.
 type RedemptionLimitConstraintParams struct {
-	MaxCount int64 `json:"max_count"`
+	MaxCount int64
 }
 
 func evaluateRedemptionLimit(

@@ -28,9 +28,9 @@ func (t ConstraintType) Validate() error {
 
 // Constraint is a typed, self-contained rule definition.
 type Constraint struct {
-	Type   ConstraintType  `json:"type"`
-	Params json.RawMessage `json:"params,omitempty"`
-	Remark string          `json:"remark,omitempty"`
+	Type   ConstraintType
+	Params json.RawMessage `json:",omitempty"`
+	Remark string          `json:",omitempty"`
 }
 
 // Constraints is an ordered list of constraint definitions.
@@ -106,8 +106,8 @@ const (
 
 // ConstraintDecision is returned by a registered evaluator.
 type ConstraintDecision struct {
-	Type ConstraintType         `json:"type"`
-	Code ConstraintDecisionCode `json:"code"`
+	Type ConstraintType
+	Code ConstraintDecisionCode
 
 	Diagnostic
 }
@@ -162,9 +162,10 @@ const (
 // ConstraintReport summarizes all constraint evaluations without
 // short-circuiting and includes only decisions that were not satisfied.
 type ConstraintReport struct {
-	Status       ConstraintReportStatus `json:"status"`
-	Unrecognized int                    `json:"unrecognized,omitempty"`
-	Violations   []ConstraintDecision   `json:"violations,omitempty"`
+	Status     ConstraintReportStatus
+	Violations []ConstraintDecision `json:",omitempty"`
+
+	Unrecognized int `json:",omitempty"`
 }
 
 // IsEvaluated reports whether constraint evaluation ran.

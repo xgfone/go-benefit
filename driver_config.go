@@ -9,8 +9,8 @@ import (
 	"unicode/utf8"
 )
 
-// JSONSchemaDraft202012 identifies the supported JSON Schema dialect.
-const JSONSchemaDraft202012 = "https://json-schema.org/draft/2020-12/schema"
+// JsonSchemaDraft202012 identifies the supported JSON Schema dialect.
+const JsonSchemaDraft202012 = "https://json-schema.org/draft/2020-12/schema"
 
 // DriverConfig contains a UTF-8 JSON object with provider-specific settings.
 // An empty value means that the driver instance has no configuration.
@@ -48,9 +48,9 @@ func (c DriverConfig) Validate() error {
 // ConfigSchema describes versioned configuration form and validation metadata.
 // DriverDefinition validation and compilation remain authoritative.
 type ConfigSchema struct {
-	Revision string          `json:"revision"`
-	Optional bool            `json:"optional,omitempty"`
-	Schema   json.RawMessage `json:"schema"`
+	Optional bool `json:",omitempty"`
+	Revision string
+	Schema   json.RawMessage
 }
 
 // Clone returns a copy whose JSON Schema document does not alias the original.
@@ -82,7 +82,7 @@ func (s ConfigSchema) Validate() error {
 	} else if err := json.Unmarshal(raw, &dialect); err != nil {
 		return errors.New("benefit: config schema $schema declaration is not a string")
 	}
-	if dialect != JSONSchemaDraft202012 {
+	if dialect != JsonSchemaDraft202012 {
 		return fmt.Errorf("benefit: unsupported config schema dialect %q", dialect)
 	}
 

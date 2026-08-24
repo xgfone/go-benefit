@@ -20,8 +20,8 @@ const (
 // Values must be non-sensitive because failed decisions may expose scope values
 // in Diagnostic.Details for troubleshooting.
 type ScopeConstraintParams struct {
-	Values []string   `json:"values"`
-	Match  ScopeMatch `json:"match,omitempty"`
+	Values []string
+	Match  ScopeMatch `json:",omitempty"`
 }
 
 // ScopeValuesExtractor extracts application-defined values for scope matching.

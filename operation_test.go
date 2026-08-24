@@ -174,10 +174,10 @@ func TestEvaluateOperationDecisionStatuses(t *testing.T) {
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if !strings.Contains(encoded, `"status":"ineligible"`) ||
-		strings.Contains(encoded, "operator-only") || strings.Contains(encoded, `"params"`) ||
-		strings.Contains(encoded, `"remark"`) || strings.Contains(encoded, `"supported"`) ||
-		strings.Contains(encoded, `"eligible"`) {
+	if !strings.Contains(encoded, `"Status":"ineligible"`) ||
+		strings.Contains(encoded, "operator-only") || strings.Contains(encoded, `"Params"`) ||
+		strings.Contains(encoded, `"Remark"`) || strings.Contains(encoded, `"Supported"`) ||
+		strings.Contains(encoded, `"Eligible"`) {
 		t.Fatalf("operation definition leaked into decision JSON: %s", encoded)
 	}
 
@@ -393,7 +393,7 @@ func TestResultStatusValidation(t *testing.T) {
 		t.Fatal("non-final result status was reported as final")
 	}
 
-	redemption := &benefit.Redemption{RedemptionID: "R1"}
+	redemption := &benefit.Redemption{RedemptionId: "R1"}
 	redeemFailure := &benefit.RedeemFailure{Code: benefit.RedeemFailureProviderRejected}
 	redeemTests := []struct {
 		name   string
@@ -419,7 +419,7 @@ func TestResultStatusValidation(t *testing.T) {
 		})
 	}
 
-	reversal := &benefit.Reversal{ReversalID: "RV1", RedemptionID: "R1"}
+	reversal := &benefit.Reversal{ReversalId: "RV1", RedemptionId: "R1"}
 	reverseFailure := &benefit.ReversalFailure{Code: benefit.ReversalFailureProviderRejected}
 	reverseTests := []struct {
 		name   string
@@ -452,7 +452,7 @@ func TestMutationRecordValidation(t *testing.T) {
 		record benefit.Redemption
 	}{
 		{"without id", benefit.Redemption{}},
-		{"with invalid outcome", benefit.Redemption{RedemptionID: "R1", Outcome: benefit.BenefitOutcome{Discount: &benefit.DiscountEffect{Type: "invalid"}}}},
+		{"with invalid outcome", benefit.Redemption{RedemptionId: "R1", Outcome: benefit.BenefitOutcome{Discount: &benefit.DiscountEffect{Type: "invalid"}}}},
 	}
 	for _, test := range redemptions {
 		t.Run(test.name, func(t *testing.T) {
@@ -466,10 +466,10 @@ func TestMutationRecordValidation(t *testing.T) {
 		name   string
 		record benefit.Reversal
 	}{
-		{"without id", benefit.Reversal{RedemptionID: "R1"}},
-		{"without redemption id", benefit.Reversal{ReversalID: "RV1"}},
-		{"with invalid currency", benefit.Reversal{ReversalID: "RV1", RedemptionID: "R1", RestoredAmount: benefit.Money{Amount: 1}}},
-		{"with negative amount", benefit.Reversal{ReversalID: "RV1", RedemptionID: "R1", RestoredAmount: benefit.Money{Amount: -1, Currency: "USD"}}},
+		{"without id", benefit.Reversal{RedemptionId: "R1"}},
+		{"without redemption id", benefit.Reversal{ReversalId: "RV1"}},
+		{"with invalid currency", benefit.Reversal{ReversalId: "RV1", RedemptionId: "R1", RestoredAmount: benefit.Money{Amount: 1}}},
+		{"with negative amount", benefit.Reversal{ReversalId: "RV1", RedemptionId: "R1", RestoredAmount: benefit.Money{Amount: -1, Currency: "USD"}}},
 	}
 	for _, test := range reversals {
 		t.Run("reversal "+test.name, func(t *testing.T) {

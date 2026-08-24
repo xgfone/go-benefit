@@ -68,8 +68,8 @@ func TestDriverRegistry(t *testing.T) {
 		t.Fatal("driver does not implement its declared reverse capability")
 	}
 	result, err := reverser.Reverse(context.Background(), benefit.ReverseRequest{
-		ReversalID:   "RV1",
-		RedemptionID: "R1",
+		ReversalId:   "RV1",
+		RedemptionId: "R1",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -291,7 +291,7 @@ func TestDriverConfigValidation(t *testing.T) {
 		t.Fatal("driver config zero detection is incorrect")
 	}
 
-	invalidUTF8 := benefit.DriverConfig(string([]byte{'{', '"', 0xff, '"', ':', '1', '}'}))
+	invalidUtf8 := benefit.DriverConfig(string([]byte{'{', '"', 0xff, '"', ':', '1', '}'}))
 	invalid := []benefit.DriverConfig{
 		"  \n\t",
 		"null",
@@ -299,7 +299,7 @@ func TestDriverConfigValidation(t *testing.T) {
 		`"value"`,
 		`{"token":`,
 		`{} {}`,
-		invalidUTF8,
+		invalidUtf8,
 	}
 	for _, config := range invalid {
 		if err := config.Validate(); err == nil {

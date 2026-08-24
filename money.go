@@ -11,8 +11,8 @@ import (
 
 // Money stores an amount in the smallest unit of its currency.
 type Money struct {
-	Amount   int64  `json:"amount"`
-	Currency string `json:"currency"`
+	Amount   int64
+	Currency string
 }
 
 // IsZero reports whether no monetary amount was supplied.
@@ -67,15 +67,15 @@ const (
 // DiscountEffect is the immutable monetary component of a benefit outcome.
 // PayRate is an exact decimal string where "0.8" means paying 80 percent.
 type DiscountEffect struct {
-	Type DiscountEffectType `json:"type"`
+	Type DiscountEffectType
 
-	Currency       string `json:"currency,omitempty"`
-	OriginalAmount int64  `json:"original_amount,omitempty"`
-	DiscountAmount int64  `json:"discount_amount,omitempty"`
-	PayableAmount  int64  `json:"payable_amount,omitempty"`
-	PayRate        string `json:"pay_rate,omitempty"`
+	Currency       string `json:",omitempty"`
+	OriginalAmount int64  `json:",omitempty"`
+	DiscountAmount int64  `json:",omitempty"`
+	PayableAmount  int64  `json:",omitempty"`
+	PayRate        string `json:",omitempty"`
 
-	ProviderData string `json:"provider_data,omitempty"`
+	ProviderData string `json:",omitempty"`
 }
 
 // Validate verifies the effect currency, amounts, and optional pay rate.

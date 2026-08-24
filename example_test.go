@@ -17,13 +17,13 @@ const (
 
 type exampleConfig struct {
 	Token          string `json:"token"`
-	MerchantID     string `json:"merchant_id"`
+	MerchantId     string `json:"merchant_id"`
 	MinimumAmount  int64  `json:"minimum_amount"`
 	DiscountAmount int64  `json:"discount_amount"`
 }
 
 type exampleUseInput struct {
-	MerchantID string
+	MerchantId string
 	Amount     benefit.Money
 }
 
@@ -94,7 +94,7 @@ func (exampleDriverDefinition) CompileConfig(raw benefit.DriverConfig) (benefit.
 		exampleMerchantConstraint,
 		"The coupon is restricted to one merchant.",
 		benefit.ScopeConstraintParams{
-			Values: []string{config.MerchantID},
+			Values: []string{config.MerchantId},
 			Match:  benefit.ScopeMatchAny,
 		},
 	)
@@ -133,7 +133,7 @@ func parseExampleConfig(raw benefit.DriverConfig) (exampleConfig, error) {
 	if err := json.Unmarshal([]byte(raw), &config); err != nil {
 		return config, err
 	}
-	if config.Token == "" || config.MerchantID == "" {
+	if config.Token == "" || config.MerchantId == "" {
 		return config, errors.New("token and merchant_id are required")
 	}
 	if config.MinimumAmount < 0 || config.DiscountAmount < 0 {
@@ -155,7 +155,7 @@ func extractExampleMerchant(input benefit.EvaluationInput) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("unexpected driver input type %T", input.Input)
 	}
-	return []string{facts.MerchantID}, nil
+	return []string{facts.MerchantId}, nil
 }
 
 type exampleCouponDriver struct {
@@ -177,14 +177,14 @@ func (d *exampleCouponDriver) Inspect(
 	}
 
 	status := benefit.StatusActive
-	providerBenefitID := "provider-coupon-1"
+	providerBenefitId := "provider-coupon-1"
 	if request.Reference.Value != "COUPON-001" {
 		status = benefit.StatusUnknown
-		providerBenefitID = ""
+		providerBenefitId = ""
 	}
 
 	return benefit.BenefitInfo{
-		ProviderBenefitID: providerBenefitID,
+		ProviderBenefitId: providerBenefitId,
 		DriverType:        exampleDriverType,
 		Name:              "CNY 20 coupon",
 		Status:            status,
@@ -262,8 +262,8 @@ func (d *exampleCouponDriver) Redeem(
 	return benefit.RedeemResult{
 		Status: benefit.ResultStatusSuccess,
 		Redemption: &benefit.Redemption{
-			RedemptionID:         request.RedemptionID,
-			ProviderRedemptionID: "provider-" + request.RedemptionID,
+			RedemptionId:         request.RedemptionId,
+			ProviderRedemptionId: "provider-" + request.RedemptionId,
 			Outcome:              evaluation.Outcome,
 			RedeemedAt:           time.Date(2026, 8, 20, 12, 0, 0, 0, time.UTC),
 		},
@@ -283,10 +283,10 @@ func (d *exampleCouponDriver) Reverse(
 	return benefit.ReverseResult{
 		Status: benefit.ResultStatusSuccess,
 		Reversal: &benefit.Reversal{
-			RedemptionID:         request.RedemptionID,
-			ProviderRedemptionID: "provider-" + request.RedemptionID,
-			ReversalID:           request.ReversalID,
-			ProviderReversalID:   "provider-" + request.ReversalID,
+			RedemptionId:         request.RedemptionId,
+			ProviderRedemptionId: "provider-" + request.RedemptionId,
+			ReversalId:           request.ReversalId,
+			ProviderReversalId:   "provider-" + request.ReversalId,
 			RestoredAmount: benefit.Money{
 				Amount:   d.config.DiscountAmount,
 				Currency: "CNY",
@@ -322,7 +322,7 @@ func Example() {
 	}
 	reference := benefit.BenefitReference{Value: "COUPON-001"}
 	driverInput := exampleUseInput{
-		MerchantID: "merchant-1",
+		MerchantId: "merchant-1",
 		Amount:     benefit.Money{Amount: 10000, Currency: "CNY"},
 	}
 
@@ -353,7 +353,7 @@ func Example() {
 	fmt.Printf("evaluate: eligible=%t payable=%s %s\n", evaluation.Eligible, major, payable.Currency)
 
 	redeemResult, err := driver.Redeem(ctx, benefit.RedeemRequest{
-		RedemptionID:    "redeem-1",
+		RedemptionId:    "redeem-1",
 		EvaluationToken: evaluation.EvaluationToken,
 		Reference:       reference,
 		Input:           driverInput,
@@ -364,7 +364,7 @@ func Example() {
 	fmt.Printf(
 		"redeem: %s provider_id=%s\n",
 		redeemResult.Status,
-		redeemResult.Redemption.ProviderRedemptionID,
+		redeemResult.Redemption.ProviderRedemptionId,
 	)
 
 	reverser, ok := driver.(benefit.Reverser)
@@ -372,8 +372,8 @@ func Example() {
 		panic("driver does not implement its declared reverse operation")
 	}
 	reverseResult, err := reverser.Reverse(ctx, benefit.ReverseRequest{
-		ReversalID:   "reverse-1",
-		RedemptionID: redeemResult.Redemption.RedemptionID,
+		ReversalId:   "reverse-1",
+		RedemptionId: redeemResult.Redemption.RedemptionId,
 		Reason:       "order cancelled",
 		Input:        driverInput,
 	})
@@ -383,7 +383,7 @@ func Example() {
 	fmt.Printf(
 		"reverse: %s provider_id=%s\n",
 		reverseResult.Status,
-		reverseResult.Reversal.ProviderReversalID,
+		reverseResult.Reversal.ProviderReversalId,
 	)
 
 	// Output:

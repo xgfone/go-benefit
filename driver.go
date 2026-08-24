@@ -23,11 +23,11 @@ func (t DriverType) Validate() error {
 // Operations contains the driver type's maximum optional capabilities beyond
 // Inspect, Evaluate, and Redeem, which every Driver supports unconditionally.
 type DriverDescriptor struct {
-	Name       string                `json:"name"`
-	Type       DriverType            `json:"type"`
-	Kind       TypeDescriptor        `json:"kind"`
-	Provider   TypeDescriptor        `json:"provider"`
-	Operations OperationCapabilities `json:"operations,omitempty"`
+	Name       string
+	Type       DriverType
+	Kind       TypeDescriptor
+	Provider   TypeDescriptor
+	Operations OperationCapabilities `json:",omitempty"`
 }
 
 // Descriptor returns the type descriptor of the driver.
@@ -144,31 +144,31 @@ type EvaluateRequest struct {
 }
 
 // RedeemRequest performs one uniquely identified redeem operation. Callers
-// must reuse RedemptionID when retrying the same uncertain operation.
+// must reuse RedemptionId when retrying the same uncertain operation.
 //
-// Drivers should use RedemptionID as a provider idempotency key when supported
+// Drivers should use RedemptionId as a provider idempotency key when supported
 // and otherwise cooperate with the host to prevent duplicate consumption.
 type RedeemRequest struct {
-	RedemptionID string `json:"redemption_id"`
+	RedemptionId string
 
 	// EvaluationToken optionally binds the redeem operation to an earlier
 	// quote or evaluated snapshot. An empty token is always valid.
-	EvaluationToken string `json:"evaluation_token,omitempty"`
+	EvaluationToken string `json:",omitempty"`
 
 	Reference BenefitReference `json:"-"`
 	Input     DriverInput      `json:"-"`
 }
 
 // ReverseRequest performs one uniquely identified reversal of a confirmed
-// redemption. Callers must reuse ReversalID when retrying the same uncertain
+// redemption. Callers must reuse ReversalId when retrying the same uncertain
 // operation.
 //
-// Drivers should use ReversalID as a provider idempotency key when supported
+// Drivers should use ReversalId as a provider idempotency key when supported
 // and otherwise cooperate with the host to prevent duplicate reversal.
 type ReverseRequest struct {
-	ReversalID   string `json:"reversal_id"`
-	RedemptionID string `json:"redemption_id"`
-	Reason       string `json:"reason,omitempty"`
+	ReversalId   string
+	RedemptionId string
+	Reason       string `json:",omitempty"`
 
 	Input DriverInput `json:"-"`
 }

@@ -92,7 +92,7 @@ func (r BenefitReference) IsZero() bool {
 
 // Validate verifies a redeem request and its operation ID.
 func (r RedeemRequest) Validate() error {
-	if r.RedemptionID == "" {
+	if r.RedemptionId == "" {
 		return errors.New("benefit: redemption id is empty")
 	}
 	return nil
@@ -100,10 +100,10 @@ func (r RedeemRequest) Validate() error {
 
 // Validate verifies a reverse request and its operation IDs.
 func (r ReverseRequest) Validate() error {
-	if r.ReversalID == "" {
+	if r.ReversalId == "" {
 		return errors.New("benefit: reversal id is empty")
 	}
-	if r.RedemptionID == "" {
+	if r.RedemptionId == "" {
 		return errors.New("benefit: reverse redemption id is empty")
 	}
 	return nil

@@ -18,24 +18,24 @@ const (
 
 // EvaluationFailure describes a local or provider eligibility failure.
 type EvaluationFailure struct {
-	Code EvaluationFailureCode `json:"code"`
+	Code EvaluationFailureCode
 
 	Diagnostic
 }
 
 // EvaluationResult is the result of evaluating a benefit for one operation.
 type EvaluationResult struct {
-	Eligible    bool             `json:"eligible"`
-	Constraints ConstraintReport `json:"constraints"`
+	Eligible    bool
+	Constraints ConstraintReport
 
 	// Failure
-	Failure *EvaluationFailure `json:"failure,omitempty"`
+	Failure *EvaluationFailure `json:",omitempty"`
 
 	// Success
-	Outcome BenefitOutcome `json:"outcome,omitzero"`
+	Outcome BenefitOutcome `json:",omitzero"`
 
-	ExpiresAt       time.Time `json:"expires_at,omitzero"`
-	EvaluationToken string    `json:"evaluation_token,omitempty"`
+	ExpiresAt       time.Time `json:",omitzero"`
+	EvaluationToken string    `json:",omitempty"`
 }
 
 // EvaluateLocalEligibility applies normalized status and constraints.

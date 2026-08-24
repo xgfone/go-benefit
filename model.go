@@ -4,16 +4,16 @@ import "time"
 
 // TypeDescriptor identifies a named type with optional display metadata.
 type TypeDescriptor struct {
-	Type string `json:"type"`
-	Name string `json:"name,omitempty"`
-	Icon string `json:"icon,omitempty"`
+	Type string
+	Name string `json:",omitempty"`
+	Icon string `json:",omitempty"`
 }
 
 // Usage describes consumption independently from lifecycle status.
 type Usage struct {
-	RedeemedCount  int64 `json:"redeemed_count"`
-	RemainingCount int64 `json:"remaining_count"`
-	Unlimited      bool  `json:"unlimited,omitempty"`
+	RedeemedCount  int64
+	RemainingCount int64
+	Unlimited      bool `json:",omitempty"`
 }
 
 // NoticeLevel controls how a human-facing notice should be presented.
@@ -32,32 +32,32 @@ type NoticeCode string
 // Notice is user- or operator-facing information associated with a benefit.
 // It does not represent an asynchronous notification or a machine capability.
 type Notice struct {
-	Code  NoticeCode  `json:"code"`
-	Level NoticeLevel `json:"level"`
+	Code  NoticeCode
+	Level NoticeLevel
 
-	Text string `json:"text"`
-	Lang string `json:"lang"` // The BCP 47 language tag for Text
+	Text string
+	Lang string // The BCP 47 language tag for Text
 }
 
 // BenefitInfo is the normalized result of inspecting a benefit.
 type BenefitInfo struct {
-	Name       string     `json:"name,omitempty"`
-	Status     Status     `json:"status"`
-	DriverType DriverType `json:"driver_type"`
+	Name       string `json:",omitempty"`
+	Status     Status
+	DriverType DriverType
 
-	Usage       Usage       `json:"usage,omitzero"`
-	Validity    Validity    `json:"validity,omitzero"`
+	Usage       Usage       `json:",omitzero"`
+	Validity    Validity    `json:",omitzero"`
 	Constraints Constraints `json:"-"`
 
 	// OperationPolicies contains only benefit-specific exceptions. Driver-wide
 	// maximum capabilities come from DriverDescriptor.Operations.
 	OperationPolicies OperationPolicies `json:"-"`
-	Notices           []Notice          `json:"notices,omitempty"`
+	Notices           []Notice          `json:",omitempty"`
 
-	// ProviderBenefitID is an optional non-secret provider record identifier.
+	// ProviderBenefitId is an optional non-secret provider record identifier.
 	// Bearer credentials belong in BenefitReference instead.
-	ProviderBenefitID string `json:"provider_benefit_id,omitempty"`
-	ProviderData      string `json:"provider_data,omitempty"`
+	ProviderBenefitId string `json:",omitempty"`
+	ProviderData      string `json:",omitempty"`
 }
 
 // BenefitReference optionally identifies a benefit presented to a bound driver.
@@ -72,9 +72,9 @@ type BenefitReference struct {
 // Evaluators must treat the input and all values reachable from it as immutable
 // and must not retain them after Evaluate returns.
 type EvaluationInput struct {
-	Benefit BenefitInfo `json:"benefit"`
+	Benefit BenefitInfo
 	Input   DriverInput `json:"-"`
-	Now     time.Time   `json:"now,omitzero"`
+	Now     time.Time   `json:",omitzero"`
 }
 
 func (in *EvaluationInput) evaluationTime() time.Time {

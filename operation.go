@@ -29,8 +29,8 @@ const (
 // Modes explicitly lists every supported mode. Reverse must include "full" and
 // may additionally include "partial".
 type OperationCapability struct {
-	Operation Operation       `json:"operation"`
-	Modes     []OperationMode `json:"modes,omitempty"`
+	Operation Operation
+	Modes     []OperationMode `json:",omitempty"`
 }
 
 // OperationCapabilities is an ordered list of a driver's maximum optional
@@ -44,11 +44,11 @@ type OperationCapabilities []OperationCapability
 //
 // A policy must either set Disabled or provide Constraints, but not both.
 type OperationPolicy struct {
-	Disabled    bool            `json:"disabled,omitempty"`
-	Operation   Operation       `json:"operation"`
-	MatchModes  []OperationMode `json:"match_modes,omitempty"`
-	Constraints Constraints     `json:"constraints,omitempty"`
-	Remark      string          `json:"remark,omitempty"`
+	Operation   Operation
+	MatchModes  []OperationMode `json:",omitempty"`
+	Constraints Constraints     `json:",omitempty"`
+	Remark      string          `json:",omitempty"`
+	Disabled    bool            `json:",omitempty"`
 }
 
 // OperationPolicies is an ordered list of benefit-specific operation policies.
@@ -208,10 +208,11 @@ func (s OperationDecisionStatus) Validate() error {
 // OperationDecision is the evaluated availability of one optional operation
 // and optional mode.
 type OperationDecision struct {
-	Operation   Operation               `json:"operation"`
-	Mode        OperationMode           `json:"mode,omitempty"`
-	Constraints ConstraintReport        `json:"constraints"`
-	Status      OperationDecisionStatus `json:"status"`
+	Operation Operation
+	Mode      OperationMode `json:",omitempty"`
+
+	Status      OperationDecisionStatus
+	Constraints ConstraintReport
 
 	Diagnostic
 }

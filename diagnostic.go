@@ -4,6 +4,6 @@ package benefit
 // troubleshooting. Reason and Details must not be used for program logic or
 // shown directly to end users. Details must contain only non-sensitive data.
 type Diagnostic struct {
-	Reason  string         `json:"reason,omitempty"`
-	Details map[string]any `json:"details,omitempty"`
+	Reason  string         `json:",omitempty"`
+	Details map[string]any `json:",omitempty"`
 }

@@ -10,8 +10,8 @@ import (
 
 // AmountConstraintParams configures a minimum or maximum operation amount.
 type AmountConstraintParams struct {
-	Amount   int64  `json:"amount"`
-	Currency string `json:"currency"`
+	Amount   int64
+	Currency string
 }
 
 // AmountExtractor extracts an operation amount from application-defined input.
@@ -112,9 +112,9 @@ func decodeAmountConstraint(constraint Constraint) (AmountConstraintParams, *Con
 }
 
 func compareCurrency(actual, required string) *ConstraintDecision {
-	actualCurrency, actualOK := currency.Get(actual)
-	requiredCurrency, requiredOK := currency.Get(required)
-	if !actualOK || !requiredOK || actualCurrency.Code != requiredCurrency.Code {
+	actualCurrency, actualOk := currency.Get(actual)
+	requiredCurrency, requiredOk := currency.Get(required)
+	if !actualOk || !requiredOk || actualCurrency.Code != requiredCurrency.Code {
 		decision := ConstraintDecisionUnsatisfied.Decision(
 			"operation currency does not match the constraint currency",
 			map[string]any{

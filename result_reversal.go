@@ -27,31 +27,31 @@ const (
 
 // ReversalFailure contains normalized and provider diagnostic information.
 type ReversalFailure struct {
-	Code ReversalFailureCode `json:"code"`
+	Code ReversalFailureCode
 
 	Diagnostic
 }
 
 // Reversal is an immutable record of one confirmed reversal operation.
 type Reversal struct {
-	RedemptionID         string `json:"redemption_id,omitempty"`
-	ProviderRedemptionID string `json:"provider_redemption_id,omitempty"`
+	RedemptionId         string `json:",omitempty"`
+	ProviderRedemptionId string `json:",omitempty"`
 
-	ReversalID         string `json:"reversal_id,omitempty"`
-	ProviderReversalID string `json:"provider_reversal_id,omitempty"`
+	ReversalId         string `json:",omitempty"`
+	ProviderReversalId string `json:",omitempty"`
 
-	RestoredAmount Money     `json:"restored_amount,omitzero"`
-	ReversedAt     time.Time `json:"reversed_at,omitzero"`
+	RestoredAmount Money     `json:",omitzero"`
+	ReversedAt     time.Time `json:",omitzero"`
 
-	ProviderData string `json:"provider_data,omitempty"`
+	ProviderData string `json:",omitempty"`
 }
 
 // Validate verifies a confirmed reversal record.
 func (r Reversal) Validate() error {
-	if r.ReversalID == "" {
+	if r.ReversalId == "" {
 		return errors.New("benefit: reversal id is empty")
 	}
-	if r.RedemptionID == "" {
+	if r.RedemptionId == "" {
 		return errors.New("benefit: reversal redemption id is empty")
 	}
 	if !r.RestoredAmount.IsZero() {
@@ -67,13 +67,13 @@ func (r Reversal) Validate() error {
 
 // ReverseResult is the business result of a reverse operation.
 type ReverseResult struct {
-	Status ResultStatus `json:"status"`
+	Status ResultStatus
 
 	// Failure
-	Failure *ReversalFailure `json:"failure,omitempty"`
+	Failure *ReversalFailure `json:",omitempty"`
 
 	// Success
-	Reversal *Reversal `json:"reversal,omitempty"`
+	Reversal *Reversal `json:",omitempty"`
 }
 
 // Validate verifies the reversal status payload invariant.

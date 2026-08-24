@@ -4,7 +4,7 @@ package benefit
 // benefit. Additional normalized outcome categories can be added without
 // changing driver operation signatures.
 type BenefitOutcome struct {
-	Discount *DiscountEffect `json:"discount,omitempty"`
+	Discount *DiscountEffect `json:",omitempty"`
 }
 
 // IsZero reports whether no normalized outcome is present.

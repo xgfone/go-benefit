@@ -17,8 +17,8 @@ const (
 
 // Validity defines an optional half-open validity window [StartsAt, ExpiresAt).
 type Validity struct {
-	StartsAt  time.Time `json:"starts_at,omitzero"`
-	ExpiresAt time.Time `json:"expires_at,omitzero"`
+	StartsAt  time.Time `json:",omitzero"`
+	ExpiresAt time.Time `json:",omitzero"`
 }
 
 // IsZero reports whether neither validity boundary is set.

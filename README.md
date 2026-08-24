@@ -71,7 +71,7 @@ and must not retain it after the call.
 
 `Inspect` returns a normalized snapshot. `BenefitInfo.DriverType` identifies the
 driver; provider and kind metadata come from its `DriverDescriptor`.
-`ProviderBenefitID` is optional and must not contain a bearer secret. Drivers map
+`ProviderBenefitId` is optional and must not contain a bearer secret. Drivers map
 raw provider states to normalized `Status` values and may retain non-standard
 diagnostics in opaque `ProviderData`.
 
@@ -157,9 +157,9 @@ optional occurrence-specific troubleshooting information; they are not stable
 or localized, must not drive logic, and must not be shown directly to end
 users. Diagnostic details must contain only non-sensitive data. Notice codes
 follow the same stable-localization principle, while notice text is user- or
-operator-facing information and carries its BCP 47 language tag in `lang`.
+operator-facing information and carries its BCP 47 language tag in `Lang`.
 
-Callers assign a unique `RedemptionID` or `ReversalID` before each mutation and
+Callers assign a unique `RedemptionId` or `ReversalId` before each mutation and
 reuse the same ID when retrying an uncertain operation. Drivers and hosts are
 responsible for implementing idempotency: drivers pass the ID to providers as
 an idempotency key when possible, while hosts must persist or deduplicate
@@ -187,6 +187,21 @@ management APIs, and protect bearer references with an appropriate lookup and
 storage strategy. `ProviderData` is opaque and may contain provider-specific
 diagnostics, so it must be reviewed before being exposed outside the trusted
 application boundary.
+
+## Naming and JSON
+
+Package-defined identifiers use camel case and treat initialisms like ordinary
+words: `Id`, `Url`, `Http`, `Json`, and `Api`, rather than `ID`, `URL`, `HTTP`,
+`JSON`, and `API`. This convention applies consistently to types, functions,
+methods, fields, constants, variables, and parameters defined by the package.
+Names from imported packages retain their original spelling.
+
+Public structs use their exported Go field names as the default JSON field
+names. JSON tags control only omission or exclusion, such as `json:",omitempty"`,
+`json:",omitzero"`, and `json:"-"`; they do not define alternative field names.
+JSON objects supplied by applications or providers, including driver configs,
+constraint params, diagnostic detail keys, and opaque provider data, keep their
+own protocol-defined naming.
 
 ## Development
 

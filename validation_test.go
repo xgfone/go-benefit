@@ -27,7 +27,7 @@ func TestValidityOmitsZeroTimes(t *testing.T) {
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if !strings.Contains(encoded, `"starts_at":`) || strings.Contains(encoded, `"expires_at":`) {
+	if !strings.Contains(encoded, `"StartsAt":`) || strings.Contains(encoded, `"ExpiresAt":`) {
 		t.Fatalf("unexpected validity JSON: %s", encoded)
 	}
 	if (benefit.Validity{StartsAt: startsAt}).IsZero() {
@@ -61,18 +61,18 @@ func TestSimpleValueValidation(t *testing.T) {
 
 func TestModelsOmitZeroValues(t *testing.T) {
 	reversal := benefit.Reversal{
-		ReversalID:   "RV1",
-		RedemptionID: "R1",
+		ReversalId:   "RV1",
+		RedemptionId: "R1",
 	}
 	tests := []struct {
 		name   string
 		value  any
 		fields []string
 	}{
-		{"evaluation input", benefit.EvaluationInput{}, []string{"now"}},
-		{"evaluation result", benefit.EvaluationResult{}, []string{"expires_at", "outcome"}},
-		{"redemption", benefit.Redemption{RedemptionID: "R1"}, []string{"outcome"}},
-		{"reversal", reversal, []string{"restored_amount"}},
+		{"evaluation input", benefit.EvaluationInput{}, []string{"Now"}},
+		{"evaluation result", benefit.EvaluationResult{}, []string{"ExpiresAt", "Outcome"}},
+		{"redemption", benefit.Redemption{RedemptionId: "R1"}, []string{"Outcome"}},
+		{"reversal", reversal, []string{"RestoredAmount"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -96,15 +96,15 @@ func TestModelsOmitZeroValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(reversalData), `"restored_amount"`) {
+	if !strings.Contains(string(reversalData), `"RestoredAmount"`) {
 		t.Fatalf("explicit zero restored amount was omitted: %s", reversalData)
 	}
 }
 
 func TestRequestValidation(t *testing.T) {
 	driverInput := struct {
-		UserID string `json:"user_id"`
-	}{UserID: "U1"}
+		UserId string `json:"user_id"`
+	}{UserId: "U1"}
 
 	if err := (benefit.RedeemRequest{
 		Input: driverInput,
@@ -112,18 +112,18 @@ func TestRequestValidation(t *testing.T) {
 		t.Fatal("redeem request without a redemption id unexpectedly validated")
 	}
 	if err := (benefit.RedeemRequest{
-		RedemptionID: "R1",
+		RedemptionId: "R1",
 		Input:        driverInput,
 	}).Validate(); err != nil {
 		t.Fatalf("valid redeem request failed: %v", err)
 	}
-	if err := (benefit.ReverseRequest{RedemptionID: "R1"}).Validate(); err == nil {
+	if err := (benefit.ReverseRequest{RedemptionId: "R1"}).Validate(); err == nil {
 		t.Fatal("reverse request without a reversal id unexpectedly validated")
 	}
-	if err := (benefit.ReverseRequest{ReversalID: "RV1"}).Validate(); err == nil {
+	if err := (benefit.ReverseRequest{ReversalId: "RV1"}).Validate(); err == nil {
 		t.Fatal("reverse request without a redemption id unexpectedly validated")
 	}
-	if err := (benefit.ReverseRequest{ReversalID: "RV1", RedemptionID: "R1"}).Validate(); err != nil {
+	if err := (benefit.ReverseRequest{ReversalId: "RV1", RedemptionId: "R1"}).Validate(); err != nil {
 		t.Fatalf("valid reverse request failed: %v", err)
 	}
 	if !(benefit.BenefitReference{}).IsZero() || (benefit.BenefitReference{Value: "B1"}).IsZero() {
@@ -131,20 +131,20 @@ func TestRequestValidation(t *testing.T) {
 	}
 }
 
-func TestRequestJSONOmitsInProcessValues(t *testing.T) {
+func TestRequestJsonOmitsInProcessValues(t *testing.T) {
 	request := benefit.RedeemRequest{
-		RedemptionID: "R1",
+		RedemptionId: "R1",
 		Reference:    benefit.BenefitReference{Value: "BEARER-CODE"},
 		Input: struct {
-			MerchantID string
-		}{MerchantID: "M1"},
+			MerchantId string
+		}{MerchantId: "M1"},
 	}
 	data, err := json.Marshal(request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if encoded != `{"redemption_id":"R1"}` ||
+	if encoded != `{"RedemptionId":"R1"}` ||
 		strings.Contains(encoded, "BEARER-CODE") || strings.Contains(encoded, "M1") {
 		t.Fatalf("in-process values leaked into request JSON: %s", encoded)
 	}
@@ -180,14 +180,14 @@ func TestBenefitInfoDoesNotMarshalConstraintOrOperationPolicyDefinitions(t *test
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if strings.Contains(encoded, `"constraints"`) || strings.Contains(encoded, `"operation_policies"`) ||
+	if strings.Contains(encoded, `"Constraints"`) || strings.Contains(encoded, `"OperationPolicies"`) ||
 		strings.Contains(encoded, "constraint-secret") || strings.Contains(encoded, "operation-secret") ||
 		strings.Contains(encoded, "operator-only") {
 		t.Fatalf("constraint or operation policy definition leaked into benefit JSON: %s", encoded)
 	}
 }
 
-func TestConstraintDecisionJSONContainsOnlyDecisionData(t *testing.T) {
+func TestConstraintDecisionJsonContainsOnlyDecisionData(t *testing.T) {
 	decision := benefit.ConstraintDecision{
 		Type: "test.example",
 		Code: benefit.ConstraintDecisionUnsatisfied,
@@ -202,11 +202,11 @@ func TestConstraintDecisionJSONContainsOnlyDecisionData(t *testing.T) {
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if !strings.Contains(encoded, `"type":"test.example"`) ||
-		!strings.Contains(encoded, `"code":"unsatisfied"`) ||
-		!strings.Contains(encoded, `"reason":"test constraint was not satisfied"`) ||
-		strings.Contains(encoded, `"constraint"`) || strings.Contains(encoded, `"params"`) ||
-		strings.Contains(encoded, `"remark"`) {
+	if !strings.Contains(encoded, `"Type":"test.example"`) ||
+		!strings.Contains(encoded, `"Code":"unsatisfied"`) ||
+		!strings.Contains(encoded, `"Reason":"test constraint was not satisfied"`) ||
+		strings.Contains(encoded, `"Constraint"`) || strings.Contains(encoded, `"Params"`) ||
+		strings.Contains(encoded, `"Remark"`) {
 		t.Fatalf("unexpected constraint decision JSON: %s", encoded)
 	}
 
@@ -219,7 +219,7 @@ func TestConstraintDecisionJSONContainsOnlyDecisionData(t *testing.T) {
 	}
 }
 
-func TestFailureDiagnosticJSON(t *testing.T) {
+func TestFailureDiagnosticJson(t *testing.T) {
 	values := []any{
 		benefit.EvaluationFailure{
 			Code:       benefit.EvaluationFailureBenefitInactive,
@@ -241,9 +241,9 @@ func TestFailureDiagnosticJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 		encoded := string(data)
-		if !strings.Contains(encoded, `"code":`) || !strings.Contains(encoded, `"reason":`) ||
-			strings.Contains(encoded, `"type":`) || strings.Contains(encoded, `"detail":`) ||
-			strings.Contains(encoded, `"message":`) {
+		if !strings.Contains(encoded, `"Code":`) || !strings.Contains(encoded, `"Reason":`) ||
+			strings.Contains(encoded, `"Type":`) || strings.Contains(encoded, `"Detail":`) ||
+			strings.Contains(encoded, `"Message":`) {
 			t.Fatalf("unexpected failure JSON: %s", encoded)
 		}
 	}
@@ -260,7 +260,7 @@ func TestConstraintTypeNamespaceValidation(t *testing.T) {
 
 func TestBenefitInfoDoesNotValidateNoticeCodeFormat(t *testing.T) {
 	info := benefit.BenefitInfo{
-		ProviderBenefitID: "P1",
+		ProviderBenefitId: "P1",
 
 		Status:     benefit.StatusActive,
 		DriverType: "test.coupon",
@@ -278,7 +278,7 @@ func TestBenefitInfoDoesNotValidateNoticeCodeFormat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), `"lang":"en-US"`) {
+	if !strings.Contains(string(data), `"Lang":"en-US"`) {
 		t.Fatalf("notice language was not encoded: %s", data)
 	}
 }
@@ -304,7 +304,7 @@ func TestBenefitInfoRequiresDriverType(t *testing.T) {
 	}
 
 	info := benefit.BenefitInfo{
-		ProviderBenefitID: "P1",
+		ProviderBenefitId: "P1",
 		DriverType:        "test.coupon",
 		Status:            benefit.StatusActive,
 	}
@@ -313,8 +313,8 @@ func TestBenefitInfoRequiresDriverType(t *testing.T) {
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if !strings.Contains(encoded, `"provider_benefit_id":"P1"`) ||
-		!strings.Contains(encoded, `"driver_type":"test.coupon"`) {
+	if !strings.Contains(encoded, `"ProviderBenefitId":"P1"`) ||
+		!strings.Contains(encoded, `"DriverType":"test.coupon"`) {
 		t.Fatalf("unexpected benefit info JSON: %s", encoded)
 	}
 }

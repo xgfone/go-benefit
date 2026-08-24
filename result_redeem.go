@@ -29,25 +29,25 @@ const (
 
 // RedeemFailure contains both normalized and provider diagnostic information.
 type RedeemFailure struct {
-	Code RedeemFailureCode `json:"code"`
+	Code RedeemFailureCode
 
 	Diagnostic
 
-	Violations []ConstraintDecision `json:"violations,omitempty"`
+	Violations []ConstraintDecision `json:",omitempty"`
 }
 
 // Redemption is an immutable record of one confirmed benefit consumption.
 type Redemption struct {
-	RedemptionID         string `json:"redemption_id"`
-	ProviderRedemptionID string `json:"provider_redemption_id,omitempty"`
+	RedemptionId         string
+	ProviderRedemptionId string `json:",omitempty"`
 
-	Outcome    BenefitOutcome `json:"outcome,omitzero"`
-	RedeemedAt time.Time      `json:"redeemed_at,omitzero"`
+	Outcome    BenefitOutcome `json:",omitzero"`
+	RedeemedAt time.Time      `json:",omitzero"`
 }
 
 // Validate verifies a confirmed redemption record.
 func (r Redemption) Validate() error {
-	if r.RedemptionID == "" {
+	if r.RedemptionId == "" {
 		return errors.New("benefit: redemption id is empty")
 	}
 
@@ -60,13 +60,13 @@ func (r Redemption) Validate() error {
 
 // RedeemResult is the business result of a redeem operation.
 type RedeemResult struct {
-	Status ResultStatus `json:"status"`
+	Status ResultStatus
 
 	// Failure
-	Failure *RedeemFailure `json:"failure,omitempty"`
+	Failure *RedeemFailure `json:",omitempty"`
 
 	// Success
-	Redemption *Redemption `json:"redemption,omitempty"`
+	Redemption *Redemption `json:",omitempty"`
 }
 
 // Validate verifies the status payload invariant.

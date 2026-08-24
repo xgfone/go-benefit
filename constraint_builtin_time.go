@@ -8,14 +8,14 @@ import (
 
 // TimeRangeConstraintParams configures an inclusive-start, exclusive-end range.
 type TimeRangeConstraintParams struct {
-	StartsAt  time.Time `json:"starts_at,omitzero"`
-	ExpiresAt time.Time `json:"expires_at,omitzero"`
+	StartsAt  time.Time `json:",omitzero"`
+	ExpiresAt time.Time `json:",omitzero"`
 }
 
 // WeekdayConstraintParams configures allowed weekdays and an optional timezone.
 type WeekdayConstraintParams struct {
-	Weekdays []time.Weekday `json:"weekdays"`
-	Timezone string         `json:"timezone,omitempty"`
+	Weekdays []time.Weekday
+	Timezone string `json:",omitempty"`
 }
 
 func evaluateTimeRange(
