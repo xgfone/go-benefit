@@ -15,6 +15,37 @@ const (
 	StatusExhausted Status = "exhausted"
 )
 
+// RedeemFailureCodeForStatus returns the redeem failure code implied by an
+// inactive benefit status. The boolean is false when the status does not by
+// itself represent a redeem failure or is invalid.
+func RedeemFailureCodeForStatus(status Status) (RedeemFailureCode, bool) {
+	switch status {
+	case StatusUnknown:
+		return RedeemFailureUnknown, true
+
+	case StatusPending:
+		return RedeemFailureBenefitPending, true
+
+	case StatusVoided:
+		return RedeemFailureBenefitVoided, true
+
+	case StatusExpired:
+		return RedeemFailureBenefitExpired, true
+
+	case StatusExhausted:
+		return RedeemFailureBenefitExhausted, true
+
+	case StatusSuspended:
+		return RedeemFailureBenefitSuspended, true
+
+	case StatusActive:
+		return "", false
+
+	default:
+		return "", false
+	}
+}
+
 // Validity defines an optional half-open validity window [StartsAt, ExpiresAt).
 type Validity struct {
 	StartsAt  time.Time `json:",omitzero"`
