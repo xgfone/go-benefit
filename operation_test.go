@@ -467,8 +467,15 @@ func TestMutationRecordValidation(t *testing.T) {
 		name   string
 		record benefit.Reversal
 	}{
-		{"with invalid currency", benefit.Reversal{RestoredAmount: benefit.Money{Amount: 1}}},
-		{"with negative amount", benefit.Reversal{RestoredAmount: benefit.Money{Amount: -1, Currency: "USD"}}},
+		{"with invalid reversed outcome", benefit.Reversal{Outcome: benefit.ReversalOutcome{
+			Reversed: benefit.BenefitOutcome{Discount: &benefit.DiscountEffect{Type: "invalid"}},
+		}}},
+		{"with invalid restored currency", benefit.Reversal{Outcome: benefit.ReversalOutcome{
+			Restored: benefit.BenefitRestoration{Amount: benefit.Money{Amount: 1}},
+		}}},
+		{"with negative restored amount", benefit.Reversal{Outcome: benefit.ReversalOutcome{
+			Restored: benefit.BenefitRestoration{Amount: benefit.Money{Amount: -1, Currency: "USD"}},
+		}}},
 	}
 	for _, test := range reversals {
 		t.Run("reversal "+test.name, func(t *testing.T) {

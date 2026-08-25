@@ -293,9 +293,13 @@ func (d *exampleCouponDriver) Reverse(
 			ProviderRedemptionId: request.ProviderRedemptionId,
 			ReversalId:           request.ReversalId,
 			ProviderReversalId:   "provider-" + request.ReversalId,
-			RestoredAmount: benefit.Money{
-				Amount:   d.config.DiscountAmount,
-				Currency: "CNY",
+			Outcome: benefit.ReversalOutcome{
+				Restored: benefit.BenefitRestoration{
+					Amount: benefit.Money{
+						Amount:   d.config.DiscountAmount,
+						Currency: "CNY",
+					},
+				},
 			},
 			ReversedAt: time.Date(2026, 8, 20, 12, 5, 0, 0, time.UTC),
 		},

@@ -141,6 +141,69 @@ func TestBenefitOutcomeValidation(t *testing.T) {
 	}
 }
 
+func TestBenefitRestorationValidation(t *testing.T) {
+	if !(benefit.BenefitRestoration{}).IsZero() {
+		t.Fatal("zero benefit restoration was not reported as zero")
+	}
+
+	valid := benefit.BenefitRestoration{
+		Amount: benefit.Money{Amount: 2000, Currency: "CNY"},
+	}
+	if valid.IsZero() {
+		t.Fatal("non-zero benefit restoration was reported as zero")
+	}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("valid benefit restoration failed: %v", err)
+	}
+
+	invalid := []benefit.BenefitRestoration{
+		{Amount: benefit.Money{Amount: 1}},
+		{Amount: benefit.Money{Amount: -1, Currency: "CNY"}},
+	}
+	for _, restoration := range invalid {
+		if err := restoration.Validate(); err == nil {
+			t.Fatal("invalid benefit restoration unexpectedly validated")
+		}
+	}
+}
+
+func TestReversalOutcomeValidation(t *testing.T) {
+	if !(benefit.ReversalOutcome{}).IsZero() {
+		t.Fatal("zero reversal outcome was not reported as zero")
+	}
+
+	valid := benefit.ReversalOutcome{
+		Reversed: benefit.BenefitOutcome{Discount: &benefit.DiscountEffect{
+			Type:           benefit.DiscountEffectAmount,
+			Currency:       "CNY",
+			OriginalAmount: 12000,
+			DiscountAmount: 2000,
+			PayableAmount:  10000,
+		}},
+		Restored: benefit.BenefitRestoration{
+			Amount: benefit.Money{Amount: 2000, Currency: "CNY"},
+		},
+	}
+	if valid.IsZero() {
+		t.Fatal("non-zero reversal outcome was reported as zero")
+	}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("valid reversal outcome failed: %v", err)
+	}
+
+	invalidReversed := valid
+	invalidReversed.Reversed.Discount = &benefit.DiscountEffect{Type: "invalid"}
+	if err := invalidReversed.Validate(); err == nil {
+		t.Fatal("invalid reversed outcome unexpectedly validated")
+	}
+
+	invalidRestored := valid
+	invalidRestored.Restored.Amount.Amount = -1
+	if err := invalidRestored.Validate(); err == nil {
+		t.Fatal("invalid restored outcome unexpectedly validated")
+	}
+}
+
 func TestResolveStatusPrecedence(t *testing.T) {
 	now := time.Date(2026, 8, 18, 12, 0, 0, 0, time.UTC)
 	past := now.Add(-time.Hour)

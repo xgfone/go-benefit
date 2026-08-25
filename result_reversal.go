@@ -42,23 +42,15 @@ type Reversal struct {
 	ReversalId         string `json:",omitempty"`
 	ProviderReversalId string `json:",omitempty"`
 
-	RestoredAmount Money     `json:",omitzero"`
-	ReversedAt     time.Time `json:",omitzero"`
+	Outcome    ReversalOutcome `json:",omitzero"`
+	ReversedAt time.Time       `json:",omitzero"`
 
 	ProviderData string `json:",omitempty"`
 }
 
 // Validate verifies a confirmed reversal record.
 func (r Reversal) Validate() error {
-	if !r.RestoredAmount.IsZero() {
-		if err := r.RestoredAmount.Validate(); err != nil {
-			return err
-		}
-		if r.RestoredAmount.Amount < 0 {
-			return errors.New("benefit: restored amount must not be negative")
-		}
-	}
-	return nil
+	return r.Outcome.Validate()
 }
 
 // ReverseResult is the business result of a reverse operation.

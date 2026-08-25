@@ -149,6 +149,14 @@ Redeem. Its current normalized component is an optional monetary discount; the
 container can gain grant or fulfillment components without changing driver
 method signatures.
 
+`ReversalOutcome` separately describes what a confirmed Reverse undid and what
+benefit resources it restored. `Reversed` contains the part of the delivered
+`BenefitOutcome` that was undone, while `Restored` contains a
+`BenefitRestoration`. Its current normalized component is an optional monetary
+balance or allowance. These values are intentionally separate: undoing a
+transaction effect does not necessarily make the consumed benefit resource
+available again, and restoring a benefit does not imply a monetary refund.
+
 All monetary values use integer minor units. Currency lookup and major/minor
 conversion are provided by
 [`go-currency`](https://github.com/xgfone/go-currency). A `free` discount means

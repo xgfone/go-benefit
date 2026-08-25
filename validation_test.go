@@ -72,7 +72,7 @@ func TestModelsOmitZeroValues(t *testing.T) {
 		{"evaluation input", benefit.EvaluationInput{}, []string{"Now"}},
 		{"evaluation result", benefit.EvaluationResult{}, []string{"ExpiresAt", "Outcome"}},
 		{"redemption", benefit.Redemption{}, []string{"RedemptionId", "ProviderRedemptionId", "Outcome"}},
-		{"reversal", reversal, []string{"RestoredAmount"}},
+		{"reversal", reversal, []string{"Outcome"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -88,7 +88,7 @@ func TestModelsOmitZeroValues(t *testing.T) {
 		})
 	}
 
-	reversal.RestoredAmount = benefit.Money{Currency: "CNY"}
+	reversal.Outcome.Restored.Amount = benefit.Money{Currency: "CNY"}
 	if err := reversal.Validate(); err != nil {
 		t.Fatalf("explicit zero restored amount failed validation: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestModelsOmitZeroValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(reversalData), `"RestoredAmount"`) {
+	if !strings.Contains(string(reversalData), `"Restored"`) {
 		t.Fatalf("explicit zero restored amount was omitted: %s", reversalData)
 	}
 }
