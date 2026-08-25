@@ -138,16 +138,20 @@ type Reverser interface {
 // the Driver call.
 type DriverInput any
 
-// InspectRequest identifies the benefit to inspect.
-type InspectRequest struct {
+// DriverRequest contains the fields common to every bound Driver call.
+type DriverRequest struct {
 	Reference BenefitReference `json:"-"`
 	Input     DriverInput      `json:"-"`
 }
 
+// InspectRequest identifies the benefit to inspect.
+type InspectRequest struct {
+	DriverRequest
+}
+
 // EvaluateRequest evaluates a benefit against one driver input.
 type EvaluateRequest struct {
-	Reference BenefitReference `json:"-"`
-	Input     DriverInput      `json:"-"`
+	DriverRequest
 }
 
 // RedeemRequest performs one uniquely identified redeem operation. Callers
@@ -156,14 +160,13 @@ type EvaluateRequest struct {
 // Drivers should use RedemptionId as a provider idempotency key when supported
 // and otherwise cooperate with the host to prevent duplicate consumption.
 type RedeemRequest struct {
+	DriverRequest
+
 	RedemptionId string
 
 	// EvaluationToken optionally binds the redeem operation to an earlier
 	// quote or evaluated snapshot. An empty token is always valid.
 	EvaluationToken string `json:",omitempty"`
-
-	Reference BenefitReference `json:"-"`
-	Input     DriverInput      `json:"-"`
 }
 
 // ReverseRequest performs one uniquely identified reversal of a confirmed
@@ -173,9 +176,9 @@ type RedeemRequest struct {
 // Drivers should use ReversalId as a provider idempotency key when supported
 // and otherwise cooperate with the host to prevent duplicate reversal.
 type ReverseRequest struct {
+	DriverRequest
+
 	ReversalId   string
 	RedemptionId string
 	Reason       string `json:",omitempty"`
-
-	Input DriverInput `json:"-"`
 }

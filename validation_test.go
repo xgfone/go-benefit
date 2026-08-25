@@ -107,13 +107,13 @@ func TestRequestValidation(t *testing.T) {
 	}{UserId: "U1"}
 
 	if err := (benefit.RedeemRequest{
-		Input: driverInput,
+		DriverRequest: benefit.DriverRequest{Input: driverInput},
 	}).Validate(); err == nil {
 		t.Fatal("redeem request without a redemption id unexpectedly validated")
 	}
 	if err := (benefit.RedeemRequest{
-		RedemptionId: "R1",
-		Input:        driverInput,
+		DriverRequest: benefit.DriverRequest{Input: driverInput},
+		RedemptionId:  "R1",
 	}).Validate(); err != nil {
 		t.Fatalf("valid redeem request failed: %v", err)
 	}
@@ -133,11 +133,13 @@ func TestRequestValidation(t *testing.T) {
 
 func TestRequestJsonOmitsInProcessValues(t *testing.T) {
 	request := benefit.RedeemRequest{
+		DriverRequest: benefit.DriverRequest{
+			Reference: benefit.BenefitReference{Value: "BEARER-CODE"},
+			Input: struct {
+				MerchantId string
+			}{MerchantId: "M1"},
+		},
 		RedemptionId: "R1",
-		Reference:    benefit.BenefitReference{Value: "BEARER-CODE"},
-		Input: struct {
-			MerchantId string
-		}{MerchantId: "M1"},
 	}
 	data, err := json.Marshal(request)
 	if err != nil {

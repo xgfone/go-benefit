@@ -69,6 +69,9 @@ implementation agree on its dynamic type. Callers, drivers, and constraint
 evaluators must treat the value and everything reachable from it as immutable
 and must not retain it after the call.
 
+`DriverRequest` groups `BenefitReference` and `DriverInput`; each
+operation-specific request type embeds it by value.
+
 `Inspect` returns a normalized snapshot. `BenefitInfo.DriverType` identifies the
 driver; provider and kind metadata come from its `DriverDescriptor`.
 `ProviderBenefitId` is optional and must not contain a bearer secret. Drivers map
