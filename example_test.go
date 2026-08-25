@@ -290,7 +290,7 @@ func (d *exampleCouponDriver) Reverse(
 		Status: benefit.ResultStatusSuccess,
 		Reversal: &benefit.Reversal{
 			RedemptionId:         request.RedemptionId,
-			ProviderRedemptionId: "provider-" + request.RedemptionId,
+			ProviderRedemptionId: request.ProviderRedemptionId,
 			ReversalId:           request.ReversalId,
 			ProviderReversalId:   "provider-" + request.ReversalId,
 			RestoredAmount: benefit.Money{
@@ -380,10 +380,11 @@ func Example() {
 		panic("driver does not implement its declared reverse operation")
 	}
 	reverseResult, err := reverser.Reverse(ctx, benefit.ReverseRequest{
-		DriverRequest: request,
-		ReversalId:    "reverse-1",
-		RedemptionId:  redeemResult.Redemption.RedemptionId,
-		Reason:        "order cancelled",
+		DriverRequest:        request,
+		ReversalId:           "reverse-1",
+		RedemptionId:         redeemResult.Redemption.RedemptionId,
+		ProviderRedemptionId: redeemResult.Redemption.ProviderRedemptionId,
+		Reason:               "order cancelled",
 	})
 	if err != nil {
 		panic(err)

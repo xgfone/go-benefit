@@ -57,10 +57,12 @@ drivers must be safe for concurrent use.
 
 ## Operation inputs and behavior
 
-`BenefitReference` is an opaque, optional reference such as a bearer coupon code
-or provider record ID. It is not a provider API credential and is excluded from
-default JSON serialization. Applications should authenticate requests and
-resolve device, merchant, or user facts before constructing driver requests.
+`BenefitReference` is an opaque reference such as a bearer coupon code or
+provider record ID. Redeem and Reverse require a non-empty reference; other
+operations may allow an empty reference when their driver contract permits it.
+It is not a provider API credential and is excluded from default JSON
+serialization. Applications should authenticate requests and resolve device,
+merchant, or user facts before constructing driver requests.
 
 `DriverInput` carries application-defined, in-process input for one driver call.
 The core package does not prescribe merchant, store, product, user, quantity,
@@ -166,13 +168,20 @@ users. Diagnostic details must contain only non-sensitive data. Notice codes
 follow the same stable-localization principle, while notice text is user- or
 operator-facing information and carries its BCP 47 language tag in `Lang`.
 
-Callers assign a unique `RedemptionId` or `ReversalId` before each mutation and
-reuse the same ID when retrying an uncertain operation. Drivers and hosts are
-responsible for implementing idempotency: drivers pass the ID to providers as
-an idempotency key when possible, while hosts must persist or deduplicate
-operations when a provider has no idempotency facility. In an idempotent
-implementation, a same-ID retry returns the original result rather than
-`benefit.redeemed`; the core package does not store operation results.
+`RedemptionId` and `ReversalId` are optional caller-assigned correlation and
+idempotency IDs. When supplied, callers reuse the same ID when retrying an
+uncertain operation. Drivers pass it to providers as an idempotency key when
+possible, while hosts may persist or deduplicate operations when a provider has
+no idempotency facility. Without an operation ID, the caller and driver can
+only rely on provider-side idempotency. In an idempotent implementation, a
+same-ID retry returns the original result rather than `benefit.redeemed`; the
+core package does not store operation results.
+
+Provider-assigned IDs are separate from caller-assigned operation IDs. Redeem
+returns a `ProviderRedemptionId` when the provider supplies one. Reverse accepts
+that ID together with the required `BenefitReference`, allowing a driver to
+address one provider redemption. Drivers that reverse the benefit as a whole
+may ignore all redemption IDs and use only `BenefitReference`.
 
 `benefit.redeemed` means a new operation targeted an already consumed benefit;
 `benefit.exhausted` means no usage, amount, or quantity remains.
@@ -184,10 +193,10 @@ implementation, a same-ID retry returns the original result rather than
 
 The package processes exactly one benefit per driver call. A future
 orchestration layer can select automatic and explicit benefits, plan their
-order, assign one operation ID per atomic redemption, and compensate completed
-steps with Reverse. A fixed exchange that one provider performs atomically may
-be modeled as Redeem; an exchange spanning independent drivers belongs in the
-orchestration layer.
+order, optionally assign one operation ID per atomic redemption, and compensate
+completed steps with Reverse. A fixed exchange that one provider performs
+atomically may be modeled as Redeem; an exchange spanning independent drivers
+belongs in the orchestration layer.
 
 Applications must encrypt stored driver configurations, mask secrets in
 management APIs, and protect bearer references with an appropriate lookup and

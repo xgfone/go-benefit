@@ -33,6 +33,8 @@ type ReversalFailure struct {
 }
 
 // Reversal is an immutable record of one confirmed reversal operation.
+// Caller- and provider-assigned IDs are optional and remain empty when they
+// were not supplied or returned.
 type Reversal struct {
 	RedemptionId         string `json:",omitempty"`
 	ProviderRedemptionId string `json:",omitempty"`
@@ -48,12 +50,6 @@ type Reversal struct {
 
 // Validate verifies a confirmed reversal record.
 func (r Reversal) Validate() error {
-	if r.ReversalId == "" {
-		return errors.New("benefit: reversal id is empty")
-	}
-	if r.RedemptionId == "" {
-		return errors.New("benefit: reversal redemption id is empty")
-	}
 	if !r.RestoredAmount.IsZero() {
 		if err := r.RestoredAmount.Validate(); err != nil {
 			return err

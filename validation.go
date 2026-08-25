@@ -90,21 +90,19 @@ func (r BenefitReference) IsZero() bool {
 	return r.Value == ""
 }
 
-// Validate verifies a redeem request and its operation ID.
+// Validate verifies that a redeem request identifies a benefit.
 func (r RedeemRequest) Validate() error {
-	if r.RedemptionId == "" {
-		return errors.New("benefit: redemption id is empty")
+	if r.Reference.IsZero() {
+		return errors.New("benefit: benefit reference is empty")
 	}
 	return nil
 }
 
-// Validate verifies a reverse request and its operation IDs.
+// Validate verifies that a reverse request identifies a benefit. Drivers may
+// impose additional requirements such as ProviderRedemptionId.
 func (r ReverseRequest) Validate() error {
-	if r.ReversalId == "" {
-		return errors.New("benefit: reversal id is empty")
-	}
-	if r.RedemptionId == "" {
-		return errors.New("benefit: reverse redemption id is empty")
+	if r.Reference.IsZero() {
+		return errors.New("benefit: benefit reference is empty")
 	}
 	return nil
 }

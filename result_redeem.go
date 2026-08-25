@@ -37,8 +37,10 @@ type RedeemFailure struct {
 }
 
 // Redemption is an immutable record of one confirmed benefit consumption.
+// RedemptionId is the optional caller-assigned ID from RedeemRequest;
+// ProviderRedemptionId is empty when the provider does not return one.
 type Redemption struct {
-	RedemptionId         string
+	RedemptionId         string `json:",omitempty"`
 	ProviderRedemptionId string `json:",omitempty"`
 
 	Outcome    BenefitOutcome `json:",omitzero"`
@@ -47,10 +49,6 @@ type Redemption struct {
 
 // Validate verifies a confirmed redemption record.
 func (r Redemption) Validate() error {
-	if r.RedemptionId == "" {
-		return errors.New("benefit: redemption id is empty")
-	}
-
 	if err := r.Outcome.Validate(); err != nil {
 		return err
 	}

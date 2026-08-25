@@ -154,31 +154,40 @@ type EvaluateRequest struct {
 	DriverRequest
 }
 
-// RedeemRequest performs one uniquely identified redeem operation. Callers
-// must reuse RedemptionId when retrying the same uncertain operation.
+// RedeemRequest performs one redeem operation for the referenced benefit.
+// RedemptionId is an optional caller-assigned correlation and idempotency ID.
 //
-// Drivers should use RedemptionId as a provider idempotency key when supported
-// and otherwise cooperate with the host to prevent duplicate consumption.
+// When RedemptionId is supplied, callers must reuse it when retrying the same
+// uncertain operation. Drivers should use it as a provider idempotency key
+// when supported. Without it, callers and drivers can only rely on
+// provider-side idempotency.
 type RedeemRequest struct {
 	DriverRequest
 
-	RedemptionId string
+	RedemptionId string `json:",omitempty"`
 
 	// EvaluationToken optionally binds the redeem operation to an earlier
 	// quote or evaluated snapshot. An empty token is always valid.
 	EvaluationToken string `json:",omitempty"`
 }
 
-// ReverseRequest performs one uniquely identified reversal of a confirmed
-// redemption. Callers must reuse ReversalId when retrying the same uncertain
-// operation.
+// ReverseRequest reverses a confirmed redemption for the referenced benefit.
+// ReversalId and RedemptionId are optional caller-assigned correlation and
+// idempotency IDs. ProviderRedemptionId is an optional provider-assigned
+// redemption ID returned by Redeem. A driver may require it in addition to the
+// benefit reference when the provider reverses individual redemptions.
 //
-// Drivers should use ReversalId as a provider idempotency key when supported
-// and otherwise cooperate with the host to prevent duplicate reversal.
+// When ReversalId is supplied, callers must reuse it when retrying the same
+// uncertain operation. Drivers should use it as a provider idempotency key
+// when supported. Without it, callers and drivers can only rely on
+// provider-side idempotency.
 type ReverseRequest struct {
 	DriverRequest
 
-	ReversalId   string
-	RedemptionId string
-	Reason       string `json:",omitempty"`
+	ReversalId   string `json:",omitempty"`
+	RedemptionId string `json:",omitempty"`
+
+	ProviderRedemptionId string `json:",omitempty"`
+
+	Reason string `json:",omitempty"`
 }

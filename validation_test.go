@@ -71,7 +71,7 @@ func TestModelsOmitZeroValues(t *testing.T) {
 	}{
 		{"evaluation input", benefit.EvaluationInput{}, []string{"Now"}},
 		{"evaluation result", benefit.EvaluationResult{}, []string{"ExpiresAt", "Outcome"}},
-		{"redemption", benefit.Redemption{RedemptionId: "R1"}, []string{"Outcome"}},
+		{"redemption", benefit.Redemption{}, []string{"RedemptionId", "ProviderRedemptionId", "Outcome"}},
 		{"reversal", reversal, []string{"RestoredAmount"}},
 	}
 	for _, test := range tests {
@@ -105,26 +105,28 @@ func TestRequestValidation(t *testing.T) {
 	driverInput := struct {
 		UserId string `json:"user_id"`
 	}{UserId: "U1"}
+	reference := benefit.BenefitReference{Value: "B1"}
 
 	if err := (benefit.RedeemRequest{
 		DriverRequest: benefit.DriverRequest{Input: driverInput},
 	}).Validate(); err == nil {
-		t.Fatal("redeem request without a redemption id unexpectedly validated")
+		t.Fatal("redeem request without a benefit reference unexpectedly validated")
 	}
 	if err := (benefit.RedeemRequest{
-		DriverRequest: benefit.DriverRequest{Input: driverInput},
-		RedemptionId:  "R1",
+		DriverRequest: benefit.DriverRequest{Reference: reference, Input: driverInput},
 	}).Validate(); err != nil {
-		t.Fatalf("valid redeem request failed: %v", err)
+		t.Fatalf("redeem request without an operation id failed: %v", err)
 	}
-	if err := (benefit.ReverseRequest{RedemptionId: "R1"}).Validate(); err == nil {
-		t.Fatal("reverse request without a reversal id unexpectedly validated")
+	if err := (benefit.ReverseRequest{
+		ReversalId:   "RV1",
+		RedemptionId: "R1",
+	}).Validate(); err == nil {
+		t.Fatal("reverse request without a benefit reference unexpectedly validated")
 	}
-	if err := (benefit.ReverseRequest{ReversalId: "RV1"}).Validate(); err == nil {
-		t.Fatal("reverse request without a redemption id unexpectedly validated")
-	}
-	if err := (benefit.ReverseRequest{ReversalId: "RV1", RedemptionId: "R1"}).Validate(); err != nil {
-		t.Fatalf("valid reverse request failed: %v", err)
+	if err := (benefit.ReverseRequest{
+		DriverRequest: benefit.DriverRequest{Reference: reference},
+	}).Validate(); err != nil {
+		t.Fatalf("reverse request without operation ids failed: %v", err)
 	}
 	if !(benefit.BenefitReference{}).IsZero() || (benefit.BenefitReference{Value: "B1"}).IsZero() {
 		t.Fatal("benefit reference zero detection is incorrect")
@@ -149,6 +151,17 @@ func TestRequestJsonOmitsInProcessValues(t *testing.T) {
 	if encoded != `{"RedemptionId":"R1"}` ||
 		strings.Contains(encoded, "BEARER-CODE") || strings.Contains(encoded, "M1") {
 		t.Fatalf("in-process values leaked into request JSON: %s", encoded)
+	}
+
+	reverseData, err := json.Marshal(benefit.ReverseRequest{
+		DriverRequest:        request.DriverRequest,
+		ProviderRedemptionId: "PR1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(reverseData) != `{"ProviderRedemptionId":"PR1"}` {
+		t.Fatalf("reverse request encoded unexpectedly: %s", reverseData)
 	}
 }
 
