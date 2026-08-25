@@ -72,7 +72,7 @@ type DiscountEffect struct {
 	PayableAmount  int64  `json:",omitempty"`
 }
 
-// Validate verifies the effect currency and amounts.
+// Validate verifies the optional effect currency and amounts.
 func (e DiscountEffect) Validate() error {
 	switch e.Type {
 	case
@@ -84,8 +84,10 @@ func (e DiscountEffect) Validate() error {
 		return fmt.Errorf("benefit: invalid discount effect type %q", e.Type)
 	}
 
-	if _, ok := currency.Get(e.Currency); !ok {
-		return fmt.Errorf("benefit: unsupported currency %q", e.Currency)
+	if e.Currency != "" {
+		if _, ok := currency.Get(e.Currency); !ok {
+			return fmt.Errorf("benefit: unsupported currency %q", e.Currency)
+		}
 	}
 	if e.OriginalAmount < 0 || e.DiscountAmount < 0 || e.PayableAmount < 0 {
 		return errors.New("benefit: discount effect amounts must not be negative")

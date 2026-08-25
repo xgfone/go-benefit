@@ -52,9 +52,12 @@ func TestDiscountEffectValidation(t *testing.T) {
 		OriginalAmount: 12000,
 		DiscountAmount: 12000,
 	}
+	withoutCurrency := percentage
+	withoutCurrency.Currency = ""
 	for name, effect := range map[string]benefit.DiscountEffect{
-		"percentage": percentage,
-		"free":       free,
+		"percentage":     percentage,
+		"free":           free,
+		"empty currency": withoutCurrency,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := effect.Validate(); err != nil {
