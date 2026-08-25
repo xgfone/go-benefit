@@ -3,8 +3,6 @@ package benefit
 import (
 	"errors"
 	"fmt"
-	"math/big"
-	"strings"
 
 	"github.com/xgfone/go-currency"
 )
@@ -65,7 +63,6 @@ const (
 )
 
 // DiscountEffect is the immutable monetary component of a benefit outcome.
-// PayRate is an exact decimal string where "0.8" means paying 80 percent.
 type DiscountEffect struct {
 	Type DiscountEffectType
 
@@ -73,10 +70,9 @@ type DiscountEffect struct {
 	OriginalAmount int64  `json:",omitempty"`
 	DiscountAmount int64  `json:",omitempty"`
 	PayableAmount  int64  `json:",omitempty"`
-	PayRate        string `json:",omitempty"`
 }
 
-// Validate verifies the effect currency, amounts, and optional pay rate.
+// Validate verifies the effect currency and amounts.
 func (e DiscountEffect) Validate() error {
 	switch e.Type {
 	case
@@ -97,38 +93,8 @@ func (e DiscountEffect) Validate() error {
 	if e.PayableAmount > e.OriginalAmount || e.OriginalAmount != e.PayableAmount+e.DiscountAmount {
 		return errors.New("benefit: discount effect amounts are inconsistent")
 	}
-	if e.Type == DiscountEffectPercentage {
-		if err := validatePayRate(e.PayRate); err != nil {
-			return err
-		}
-	}
 	if e.Type == DiscountEffectFree && e.PayableAmount != 0 {
 		return errors.New("benefit: free effect must have a zero payable amount")
-	}
-
-	return nil
-}
-
-func validatePayRate(rate string) error {
-	rate = strings.TrimSpace(rate)
-	switch rate {
-	case "":
-		return errors.New("benefit: percentage effect pay rate is empty")
-
-	case "0", "0.0": /* 0% */
-		return nil
-
-	case "1", "1.0": /* 100% */
-		return nil
-	}
-
-	r, ok := new(big.Rat).SetString(rate)
-	if !ok {
-		return fmt.Errorf("benefit: invalid pay rate %q", rate)
-	}
-
-	if r.Sign() < 0 || r.Cmp(big.NewRat(1, 1)) > 0 {
-		return fmt.Errorf("benefit: pay rate %q is outside [0,1]", rate)
 	}
 
 	return nil

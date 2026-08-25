@@ -43,7 +43,6 @@ func TestDiscountEffectValidation(t *testing.T) {
 		Type:           benefit.DiscountEffectPercentage,
 		Currency:       "CNY",
 		OriginalAmount: 12000,
-		PayRate:        "0.8",
 		DiscountAmount: 2400,
 		PayableAmount:  9600,
 	}
@@ -82,30 +81,12 @@ func TestDiscountEffectValidation(t *testing.T) {
 		"invalid currency":     invalidCurrency,
 		"negative amount":      negativeAmount,
 	}
-	for rate, name := range map[string]string{
-		"":     "empty pay rate",
-		"bad":  "invalid pay rate",
-		"-0.1": "negative pay rate",
-		"1.1":  "pay rate above one",
-	} {
-		effect := percentage
-		effect.PayRate = rate
-		invalidEffects[name] = effect
-	}
 	for name, effect := range invalidEffects {
 		t.Run(name, func(t *testing.T) {
 			if err := effect.Validate(); err == nil {
 				t.Fatal("invalid discount effect unexpectedly validated")
 			}
 		})
-	}
-
-	for _, rate := range []string{"0", "0.0", "1", "1.0", "1/2"} {
-		effect := percentage
-		effect.PayRate = rate
-		if err := effect.Validate(); err != nil {
-			t.Fatalf("valid pay rate %q failed: %v", rate, err)
-		}
 	}
 }
 
