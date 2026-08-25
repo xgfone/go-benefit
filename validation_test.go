@@ -71,8 +71,8 @@ func TestModelsOmitZeroValues(t *testing.T) {
 	}{
 		{"evaluation input", benefit.EvaluationInput{}, []string{"Now"}},
 		{"evaluation result", benefit.EvaluationResult{}, []string{"ExpiresAt", "Outcome"}},
-		{"redemption", benefit.Redemption{}, []string{"RedemptionId", "ProviderRedemptionId", "Outcome"}},
-		{"reversal", reversal, []string{"Outcome"}},
+		{"redemption", benefit.Redemption{}, []string{"RedemptionId", "ProviderRedemptionId", "Outcome", "ProviderData"}},
+		{"reversal", reversal, []string{"Outcome", "ProviderData"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -98,6 +98,33 @@ func TestModelsOmitZeroValues(t *testing.T) {
 	}
 	if !strings.Contains(string(reversalData), `"Restored"`) {
 		t.Fatalf("explicit zero restored amount was omitted: %s", reversalData)
+	}
+}
+
+func TestMutationProviderDataJSONPlacement(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+	}{
+		{"redemption", benefit.Redemption{ProviderData: "redeem-provider-data"}},
+		{"reversal", benefit.Reversal{ProviderData: "reverse-provider-data"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data, err := json.Marshal(test.value)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(data, &fields); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := fields["ProviderData"]; !ok {
+				t.Fatalf("top-level provider data was omitted: %s", data)
+			}
+		})
 	}
 }
 

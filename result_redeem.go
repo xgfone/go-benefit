@@ -45,6 +45,10 @@ type Redemption struct {
 
 	Outcome    BenefitOutcome `json:",omitzero"`
 	RedeemedAt time.Time      `json:",omitzero"`
+
+	// ProviderData contains opaque provider-specific data for this confirmed
+	// redemption operation.
+	ProviderData string `json:",omitempty"`
 }
 
 // Validate verifies a confirmed redemption record.

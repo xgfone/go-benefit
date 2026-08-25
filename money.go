@@ -74,8 +74,6 @@ type DiscountEffect struct {
 	DiscountAmount int64  `json:",omitempty"`
 	PayableAmount  int64  `json:",omitempty"`
 	PayRate        string `json:",omitempty"`
-
-	ProviderData string `json:",omitempty"`
 }
 
 // Validate verifies the effect currency, amounts, and optional pay rate.
