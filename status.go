@@ -15,6 +15,16 @@ const (
 	StatusExhausted Status = "exhausted"
 )
 
+// IsActive reports whether the status is active.
+func (s Status) IsActive() bool {
+	return s == StatusActive
+}
+
+// IsPending reports whether the status is pending.
+func (s Status) IsPending() bool {
+	return s == StatusPending
+}
+
 // RedeemFailureCodeForStatus returns the redeem failure code implied by an
 // inactive benefit status. The boolean is false when the status does not by
 // itself represent a redeem failure or is invalid.

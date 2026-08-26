@@ -168,6 +168,12 @@ type ConstraintReport struct {
 	Unrecognized int `json:",omitempty"`
 }
 
+// IsZero reports whether the report contains no status, violations, or
+// unrecognized constraints.
+func (r ConstraintReport) IsZero() bool {
+	return r.Status == "" && len(r.Violations) == 0 && r.Unrecognized == 0
+}
+
 // IsEvaluated reports whether constraint evaluation ran.
 func (r ConstraintReport) IsEvaluated() bool {
 	return r.Status == ConstraintReportStatusSatisfied ||

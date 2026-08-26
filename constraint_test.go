@@ -30,6 +30,28 @@ func TestUnknownConstraintIsUnsatisfied(t *testing.T) {
 	}
 }
 
+func TestConstraintReportIsZero(t *testing.T) {
+	tests := []struct {
+		name   string
+		report benefit.ConstraintReport
+		want   bool
+	}{
+		{name: "zero", want: true},
+		{name: "empty violations", report: benefit.ConstraintReport{Violations: []benefit.ConstraintDecision{}}, want: true},
+		{name: "status", report: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusUnevaluated}},
+		{name: "violation", report: benefit.ConstraintReport{Violations: []benefit.ConstraintDecision{{}}}},
+		{name: "unrecognized", report: benefit.ConstraintReport{Unrecognized: 1}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.report.IsZero(); got != test.want {
+				t.Fatalf("IsZero() = %t, want %t", got, test.want)
+			}
+		})
+	}
+}
+
 func TestUnregisteredConstraintTypeIsUnrecognized(t *testing.T) {
 	constraint := benefit.Constraint{Type: "not_namespaced"}
 	decision := benefit.NewConstraintRegistry().Evaluate(

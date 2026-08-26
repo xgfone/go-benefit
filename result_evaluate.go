@@ -31,7 +31,7 @@ type EvaluationFailure struct {
 // EvaluationResult is the result of evaluating a benefit for one operation.
 type EvaluationResult struct {
 	Eligible    bool
-	Constraints ConstraintReport
+	Constraints ConstraintReport `json:",omitzero"`
 
 	// Failure
 	Failure *EvaluationFailure `json:",omitempty"`
