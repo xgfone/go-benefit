@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"github.com/xgfone/go-currency"
 )
 
 // AmountConstraintParams configures a minimum or maximum operation amount.
+// An empty Currency makes the constraint apply to every transaction currency.
 type AmountConstraintParams struct {
 	Amount   int64
 	Currency string
@@ -101,20 +100,17 @@ func decodeAmountConstraint(constraint Constraint) (AmountConstraintParams, *Con
 		return params, &decision
 	}
 
-	c, ok := currency.Get(params.Currency)
-	if !ok {
-		decision := invalidConstraint(fmt.Sprintf("unsupported currency %q", params.Currency))
+	if err := validateCurrencyCode(params.Currency); err != nil {
+		decision := invalidConstraint(err.Error())
 		return params, &decision
 	}
 
-	params.Currency = c.Code
+	params.Currency = canonicalCurrencyCode(params.Currency)
 	return params, nil
 }
 
 func compareCurrency(actual, required string) *ConstraintDecision {
-	actualCurrency, actualOk := currency.Get(actual)
-	requiredCurrency, requiredOk := currency.Get(required)
-	if !actualOk || !requiredOk || actualCurrency.Code != requiredCurrency.Code {
+	if required != "" && !equalCurrencyCode(actual, required) {
 		decision := ConstraintDecisionUnsatisfied.Decision(
 			"operation currency does not match the constraint currency",
 			map[string]any{

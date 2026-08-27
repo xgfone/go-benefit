@@ -295,7 +295,7 @@ func (d *exampleCouponDriver) Reverse(
 			ProviderReversalId:   "provider-" + request.ReversalId,
 			Outcome: benefit.ReversalOutcome{
 				Restored: benefit.BenefitRestoration{
-					Amount: benefit.Money{
+					Amount: &benefit.Money{
 						Amount:   d.config.DiscountAmount,
 						Currency: "CNY",
 					},
@@ -355,15 +355,14 @@ func Example() {
 	if err != nil {
 		panic(err)
 	}
-	payable := benefit.Money{
-		Amount:   evaluation.Outcome.Discount.PayableAmount,
-		Currency: evaluation.Outcome.Discount.Currency,
-	}
-	major, err := payable.Major()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("evaluate: eligible=%t payable=%s %s\n", evaluation.Eligible, major, payable.Currency)
+	payable := evaluation.Outcome.Discount.PayableAmount
+	fmt.Printf(
+		"evaluate: eligible=%t payable=%d.%02d %s\n",
+		evaluation.Eligible,
+		payable/100,
+		payable%100,
+		evaluation.Outcome.Discount.Currency,
+	)
 
 	redeemResult, err := driver.Redeem(ctx, benefit.RedeemRequest{
 		DriverRequest:   request,
@@ -385,6 +384,7 @@ func Example() {
 	}
 	reverseResult, err := reverser.Reverse(ctx, benefit.ReverseRequest{
 		DriverRequest:        request,
+		Mode:                 benefit.OperationModeReverseFull,
 		ReversalId:           "reverse-1",
 		RedemptionId:         redeemResult.Redemption.RedemptionId,
 		ProviderRedemptionId: redeemResult.Redemption.ProviderRedemptionId,

@@ -23,20 +23,26 @@ func (o BenefitOutcome) Validate() error {
 }
 
 // BenefitRestoration describes benefit resources made available again by a
-// confirmed reversal. Amount is a restored monetary balance or allowance; it
-// is distinct from the transaction value described by BenefitOutcome.
+// confirmed reversal.
 type BenefitRestoration struct {
-	Amount Money `json:",omitzero"`
+	// Amount is a restored monetary balance or allowance; it is distinct from
+	// the transaction value described by BenefitOutcome.
+	//
+	// A nil Amount means none was supplied; a non-nil pointer distinguishes
+	// an explicit zero amount from a non-zero amount. An amount with an empty
+	// Currency first inherits Reversed.Discount.Currency when present, then
+	// the transaction currency.
+	Amount *Money `json:",omitempty"`
 }
 
 // IsZero reports whether no normalized restoration is present.
 func (r BenefitRestoration) IsZero() bool {
-	return r.Amount.IsZero()
+	return r.Amount == nil
 }
 
 // Validate verifies every normalized restoration component that is present.
 func (r BenefitRestoration) Validate() error {
-	if !r.Amount.IsZero() {
+	if r.Amount != nil {
 		if err := r.Amount.Validate(); err != nil {
 			return err
 		}

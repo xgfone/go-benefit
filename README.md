@@ -140,7 +140,9 @@ driver should return a merchant, store, or product mismatch as a
 The default registry includes context-independent time-range, weekday, and
 redemption-limit evaluators. Amount and scope evaluators require
 application-defined extractors so the package does not need a universal
-transaction structure.
+transaction structure. A currency-wildcard amount constraint applies the same
+integer threshold in the actual currency's minor-unit convention; it does not
+perform precision or exchange-rate conversion.
 
 ## Outcomes and mutation results
 
@@ -156,11 +158,19 @@ benefit resources it restored. `Reversed` contains the part of the delivered
 balance or allowance. These values are intentionally separate: undoing a
 transaction effect does not necessarily make the consumed benefit resource
 available again, and restoring a benefit does not imply a monetary refund.
+The restored amount is not required to equal the reversed discount amount.
 
-All monetary values use integer minor units. Currency lookup and major/minor
-conversion are provided by
-[`go-currency`](https://github.com/xgfone/go-currency). A `free` discount means
-the payable amount is zero and the discount equals the original amount.
+All monetary values use integer minor units. Major/minor-unit conversion,
+currency precision, exchange rates, and validation against the assigned ISO
+4217 code list are application responsibilities; the core package carries no
+currency registry. A non-empty `Currency` must have the three-ASCII-letter ISO
+4217 form. Input and comparison are case-insensitive, while applications and
+drivers should emit the canonical upper-case form.
+
+The meaning of an empty currency is field-specific and documented on its
+containing type. Drivers should resolve and emit currencies on durable outcomes
+when possible so the records remain self-contained. A `free` discount means the
+payable amount is zero and the discount equals the original amount.
 
 State-changing results distinguish confirmed success, confirmed failure,
 accepted but pending work, and an unknown outcome. Provider timeouts must not be

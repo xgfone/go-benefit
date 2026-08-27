@@ -104,5 +104,10 @@ func (r ReverseRequest) Validate() error {
 	if r.Reference.IsZero() {
 		return errors.New("benefit: benefit reference is empty")
 	}
+	switch r.Mode {
+	case "", OperationModeReverseFull, OperationModeReversePartial:
+	default:
+		return fmt.Errorf("benefit: invalid reverse operation mode %q", r.Mode)
+	}
 	return nil
 }

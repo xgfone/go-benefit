@@ -215,6 +215,41 @@ func TestAmountConstraintRejectsCurrencyMismatch(t *testing.T) {
 	}
 }
 
+func TestAmountConstraintCurrencyMatching(t *testing.T) {
+	registry := benefit.NewConstraintRegistry()
+	if err := registry.Register(
+		benefit.ConstraintMinimumAmount,
+		benefit.NewMinimumAmountConstraintEvaluator(extractTestAmount),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		required string
+		actual   string
+	}{
+		{name: "case insensitive", required: "usd", actual: "USD"},
+		{name: "wildcard with currency", actual: "CNY"},
+		{name: "wildcard with inherited currency"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			minimum := mustConstraint(t, benefit.ConstraintMinimumAmount, benefit.AmountConstraintParams{
+				Amount:   100,
+				Currency: test.required,
+			})
+			input := benefit.EvaluationInput{Input: testDriverInput{
+				Amount: benefit.Money{Amount: 100, Currency: test.actual},
+			}}
+			decision := registry.Evaluate(context.Background(), minimum, input)
+			if !decision.IsSatisfied() {
+				t.Fatalf("currency match unexpectedly failed: %#v", decision)
+			}
+		})
+	}
+}
+
 func TestAmountConstraintEvaluatorBranches(t *testing.T) {
 	validMaximum := mustConstraint(t, benefit.ConstraintMaximumAmount, benefit.AmountConstraintParams{
 		Amount:   100,
@@ -240,6 +275,9 @@ func TestAmountConstraintEvaluatorBranches(t *testing.T) {
 	invalidActual := benefit.NewMinimumAmountConstraintEvaluator(
 		staticAmountExtractor(benefit.Money{Amount: -1, Currency: "USD"}, true, nil),
 	)
+	invalidActualCurrency := benefit.NewMinimumAmountConstraintEvaluator(
+		staticAmountExtractor(benefit.Money{Amount: 1, Currency: "US1"}, true, nil),
+	)
 	available := benefit.NewMinimumAmountConstraintEvaluator(
 		staticAmountExtractor(benefit.Money{Currency: "USD"}, true, nil),
 	)
@@ -256,6 +294,7 @@ func TestAmountConstraintEvaluatorBranches(t *testing.T) {
 		{"nil extractor", benefit.NewMinimumAmountConstraintEvaluator(nil), validMinimum, "", true},
 		{"extractor error", extractorError, validMinimum, "", true},
 		{"invalid actual amount", invalidActual, validMinimum, "", true},
+		{"invalid actual currency", invalidActualCurrency, validMinimum, "", true},
 		{"invalid constraint amount", available, invalidAmount, benefit.ConstraintDecisionInvalid, false},
 		{"invalid constraint currency", available, invalidCurrency, benefit.ConstraintDecisionInvalid, false},
 	}

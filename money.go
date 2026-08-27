@@ -3,54 +3,25 @@ package benefit
 import (
 	"errors"
 	"fmt"
-
-	"github.com/xgfone/go-currency"
+	"strings"
 )
 
-// Money stores an amount in the smallest unit of its currency.
+// Money stores an integer amount and its optional ISO 4217 currency code.
+// The containing model defines the meaning of an empty currency.
 type Money struct {
 	Amount   int64
 	Currency string
 }
 
-// IsZero reports whether no monetary amount was supplied.
+// IsZero reports whether both fields have their zero values.
 func (m Money) IsZero() bool {
 	return m == (Money{})
 }
 
-// NewMoney constructs and validates a minor-unit monetary amount.
-func NewMoney(amount int64, currencyCode string) (Money, error) {
-	c, ok := currency.Get(currencyCode)
-	if !ok {
-		return Money{}, fmt.Errorf("benefit: unsupported currency %q", currencyCode)
-	}
-
-	return Money{Amount: amount, Currency: c.Code}, nil
-}
-
-// ParseMajorMoney converts a major-unit decimal string into Money.
-func ParseMajorMoney(majorAmount, currencyCode string) (Money, error) {
-	amount, err := currency.ParseMajorToMinor(majorAmount, currencyCode)
-	if err != nil {
-		return Money{}, err
-	}
-	return NewMoney(amount, currencyCode)
-}
-
-// Validate reports whether the currency code is registered.
+// Validate verifies the syntax of a non-empty currency. ISO 4217 membership
+// and major/minor-unit conversion are the caller's responsibility.
 func (m Money) Validate() error {
-	if _, ok := currency.Get(m.Currency); !ok {
-		return fmt.Errorf("benefit: unsupported currency %q", m.Currency)
-	}
-	return nil
-}
-
-// Major formats the minor-unit amount as a major-unit decimal string.
-func (m Money) Major() (string, error) {
-	if err := m.Validate(); err != nil {
-		return "", err
-	}
-	return currency.FormatMinorToMajor(m.Amount, m.Currency)
+	return validateCurrencyCode(m.Currency)
 }
 
 // DiscountEffectType identifies a monetary benefit outcome.
@@ -63,6 +34,8 @@ const (
 )
 
 // DiscountEffect is the immutable monetary component of a benefit outcome.
+// An empty Currency inherits the transaction currency. All three amounts use
+// the same effective currency.
 type DiscountEffect struct {
 	Type DiscountEffectType
 
@@ -84,10 +57,8 @@ func (e DiscountEffect) Validate() error {
 		return fmt.Errorf("benefit: invalid discount effect type %q", e.Type)
 	}
 
-	if e.Currency != "" {
-		if _, ok := currency.Get(e.Currency); !ok {
-			return fmt.Errorf("benefit: unsupported currency %q", e.Currency)
-		}
+	if err := validateCurrencyCode(e.Currency); err != nil {
+		return err
 	}
 	if e.OriginalAmount < 0 || e.DiscountAmount < 0 || e.PayableAmount < 0 {
 		return errors.New("benefit: discount effect amounts must not be negative")
@@ -100,4 +71,30 @@ func (e DiscountEffect) Validate() error {
 	}
 
 	return nil
+}
+
+// validateCurrencyCode accepts an empty inherited or wildcard currency and
+// otherwise verifies the case-insensitive alphabetic form of an ISO 4217 code.
+// It deliberately does not carry a registry of assigned codes.
+func validateCurrencyCode(code string) error {
+	if code == "" {
+		return nil
+	}
+	if len(code) != 3 {
+		return fmt.Errorf("benefit: invalid ISO 4217 currency code %q", code)
+	}
+	for i := range len(code) {
+		if (code[i] < 'A' || code[i] > 'Z') && (code[i] < 'a' || code[i] > 'z') {
+			return fmt.Errorf("benefit: invalid ISO 4217 currency code %q", code)
+		}
+	}
+	return nil
+}
+
+func canonicalCurrencyCode(code string) string {
+	return strings.ToUpper(code)
+}
+
+func equalCurrencyCode(left, right string) bool {
+	return strings.EqualFold(left, right)
 }

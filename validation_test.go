@@ -88,7 +88,7 @@ func TestModelsOmitZeroValues(t *testing.T) {
 		})
 	}
 
-	reversal.Outcome.Restored.Amount = benefit.Money{Currency: "CNY"}
+	reversal.Outcome.Restored.Amount = &benefit.Money{}
 	if err := reversal.Validate(); err != nil {
 		t.Fatalf("explicit zero restored amount failed validation: %v", err)
 	}
@@ -155,6 +155,23 @@ func TestRequestValidation(t *testing.T) {
 	}).Validate(); err != nil {
 		t.Fatalf("reverse request without operation ids failed: %v", err)
 	}
+	for _, mode := range []benefit.OperationMode{
+		benefit.OperationModeReverseFull,
+		benefit.OperationModeReversePartial,
+	} {
+		if err := (benefit.ReverseRequest{
+			DriverRequest: benefit.DriverRequest{Reference: reference},
+			Mode:          mode,
+		}).Validate(); err != nil {
+			t.Fatalf("reverse request mode %q failed: %v", mode, err)
+		}
+	}
+	if err := (benefit.ReverseRequest{
+		DriverRequest: benefit.DriverRequest{Reference: reference},
+		Mode:          "invalid",
+	}).Validate(); err == nil {
+		t.Fatal("reverse request with invalid mode unexpectedly validated")
+	}
 	if !(benefit.BenefitReference{}).IsZero() || (benefit.BenefitReference{Value: "B1"}).IsZero() {
 		t.Fatal("benefit reference zero detection is incorrect")
 	}
@@ -182,12 +199,13 @@ func TestRequestJsonOmitsInProcessValues(t *testing.T) {
 
 	reverseData, err := json.Marshal(benefit.ReverseRequest{
 		DriverRequest:        request.DriverRequest,
+		Mode:                 benefit.OperationModeReversePartial,
 		ProviderRedemptionId: "PR1",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(reverseData) != `{"ProviderRedemptionId":"PR1"}` {
+	if string(reverseData) != `{"ProviderRedemptionId":"PR1","Mode":"partial"}` {
 		t.Fatalf("reverse request encoded unexpectedly: %s", reverseData)
 	}
 }

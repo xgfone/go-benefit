@@ -176,6 +176,7 @@ type RedeemRequest struct {
 // idempotency IDs. ProviderRedemptionId is an optional provider-assigned
 // redemption ID returned by Redeem. A driver may require it in addition to the
 // benefit reference when the provider reverses individual redemptions.
+// Mode selects a full or partial reversal; an empty Mode means full.
 //
 // When ReversalId is supplied, callers must reuse it when retrying the same
 // uncertain operation. Drivers should use it as a provider idempotency key
@@ -189,5 +190,6 @@ type ReverseRequest struct {
 
 	ProviderRedemptionId string `json:",omitempty"`
 
-	Reason string `json:",omitempty"`
+	Mode   OperationMode `json:",omitempty"`
+	Reason string        `json:",omitempty"`
 }

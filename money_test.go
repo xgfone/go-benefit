@@ -7,34 +7,31 @@ import (
 	benefit "github.com/xgfone/go-benefit"
 )
 
-func TestMoneyMajorMinorConversion(t *testing.T) {
+func TestMoneyValidation(t *testing.T) {
 	if !(benefit.Money{}).IsZero() || (benefit.Money{Currency: "CNY"}).IsZero() {
 		t.Fatal("money zero detection is incorrect")
 	}
 
-	money, err := benefit.ParseMajorMoney("12.34", "cny")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if money.Amount != 1234 || money.Currency != "CNY" {
-		t.Fatalf("unexpected money: %#v", money)
+	for _, money := range []benefit.Money{
+		{},
+		{Amount: 1234},
+		{Amount: 1234, Currency: "CNY"},
+		{Amount: 1234, Currency: "cny"},
+	} {
+		if err := money.Validate(); err != nil {
+			t.Fatalf("valid money %#v failed: %v", money, err)
+		}
 	}
 
-	major, err := money.Major()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if major != "12.34" {
-		t.Fatalf("got major %q, want 12.34", major)
-	}
-	if _, err := benefit.NewMoney(1, "invalid"); err == nil {
-		t.Fatal("unsupported currency unexpectedly constructed money")
-	}
-	if _, err := benefit.ParseMajorMoney("not-a-number", "CNY"); err == nil {
-		t.Fatal("invalid major amount unexpectedly parsed")
-	}
-	if _, err := (benefit.Money{}).Major(); err == nil {
-		t.Fatal("money without a currency unexpectedly formatted")
+	for _, money := range []benefit.Money{
+		{Currency: "CN"},
+		{Currency: "CNY1"},
+		{Currency: "CN1"},
+		{Currency: "人民币"},
+	} {
+		if err := money.Validate(); err == nil {
+			t.Fatalf("invalid money %#v unexpectedly validated", money)
+		}
 	}
 }
 
@@ -130,8 +127,20 @@ func TestBenefitRestorationValidation(t *testing.T) {
 		t.Fatal("zero benefit restoration was not reported as zero")
 	}
 
+	explicitZero := benefit.BenefitRestoration{Amount: &benefit.Money{}}
+	if explicitZero.IsZero() {
+		t.Fatal("explicit zero restoration was reported as absent")
+	}
+	if err := explicitZero.Validate(); err != nil {
+		t.Fatalf("explicit zero restoration failed: %v", err)
+	}
+	inheritedCurrency := benefit.BenefitRestoration{Amount: &benefit.Money{Amount: 2000}}
+	if err := inheritedCurrency.Validate(); err != nil {
+		t.Fatalf("restoration with inherited currency failed: %v", err)
+	}
+
 	valid := benefit.BenefitRestoration{
-		Amount: benefit.Money{Amount: 2000, Currency: "CNY"},
+		Amount: &benefit.Money{Amount: 2000, Currency: "CNY"},
 	}
 	if valid.IsZero() {
 		t.Fatal("non-zero benefit restoration was reported as zero")
@@ -141,8 +150,8 @@ func TestBenefitRestorationValidation(t *testing.T) {
 	}
 
 	invalid := []benefit.BenefitRestoration{
-		{Amount: benefit.Money{Amount: 1}},
-		{Amount: benefit.Money{Amount: -1, Currency: "CNY"}},
+		{Amount: &benefit.Money{Amount: 1, Currency: "US1"}},
+		{Amount: &benefit.Money{Amount: -1, Currency: "CNY"}},
 	}
 	for _, restoration := range invalid {
 		if err := restoration.Validate(); err == nil {
@@ -165,7 +174,7 @@ func TestReversalOutcomeValidation(t *testing.T) {
 			PayableAmount:  10000,
 		}},
 		Restored: benefit.BenefitRestoration{
-			Amount: benefit.Money{Amount: 2000, Currency: "CNY"},
+			Amount: &benefit.Money{Amount: 2000, Currency: "CNY"},
 		},
 	}
 	if valid.IsZero() {
@@ -182,7 +191,7 @@ func TestReversalOutcomeValidation(t *testing.T) {
 	}
 
 	invalidRestored := valid
-	invalidRestored.Restored.Amount.Amount = -1
+	invalidRestored.Restored.Amount = &benefit.Money{Amount: -1, Currency: "CNY"}
 	if err := invalidRestored.Validate(); err == nil {
 		t.Fatal("invalid restored outcome unexpectedly validated")
 	}
