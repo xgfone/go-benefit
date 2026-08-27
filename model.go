@@ -43,15 +43,15 @@ type Notice struct {
 type BenefitInfo struct {
 	Name       string `json:",omitempty"`
 	Status     Status
-	DriverType DriverType
+	DriverType DriverType `json:",omitempty"`
 
 	Usage       Usage       `json:",omitzero"`
 	Validity    Validity    `json:",omitzero"`
-	Constraints Constraints `json:"-"`
+	Constraints Constraints `json:",omitzero"`
 
 	// OperationPolicies contains only benefit-specific exceptions. Driver-wide
 	// maximum capabilities come from DriverDescriptor.Operations.
-	OperationPolicies OperationPolicies `json:"-"`
+	OperationPolicies OperationPolicies `json:",omitempty"`
 	Notices           []Notice          `json:",omitempty"`
 
 	// ProviderBenefitId is an optional non-secret provider record identifier.

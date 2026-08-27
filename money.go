@@ -10,7 +10,7 @@ import (
 // The containing model defines the meaning of an empty currency.
 type Money struct {
 	Amount   int64
-	Currency string
+	Currency string `json:",omitempty"`
 }
 
 // IsZero reports whether both fields have their zero values.
