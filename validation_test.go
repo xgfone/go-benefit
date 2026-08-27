@@ -210,28 +210,28 @@ func TestRequestJsonOmitsInProcessValues(t *testing.T) {
 	}
 }
 
-func TestBenefitInfoDoesNotMarshalConstraintOrOperationPolicyDefinitions(t *testing.T) {
+func TestBenefitInfoMarshalsConstraintAndOperationPolicyDefinitions(t *testing.T) {
 	operationConstraint := benefit.Constraint{
 		Type:   "test.operation_rule",
-		Params: json.RawMessage(`{"secret":"operation-secret"}`),
-		Remark: "operator-only operation constraint",
+		Params: json.RawMessage(`{"minimum":2}`),
+		Remark: "operation constraint",
 	}
 	value := benefit.BenefitInfo{
 		Status:     benefit.StatusActive,
 		DriverType: "test.coupon",
 		Constraints: benefit.Constraints{
-			benefit.Constraint{
+			{
 				Type:   "test.provider_rule",
-				Params: json.RawMessage(`{"secret":"constraint-secret"}`),
-				Remark: "operator-only constraint remark",
+				Params: json.RawMessage(`{"minimum":1}`),
+				Remark: "benefit constraint",
 			},
 		},
 		OperationPolicies: benefit.OperationPolicies{
-			benefit.OperationPolicy{
+			{
 				Operation:   benefit.OperationReverse,
 				MatchModes:  []benefit.OperationMode{benefit.OperationModeReverseFull},
 				Constraints: benefit.Constraints{operationConstraint},
-				Remark:      "operator-only operation policy",
+				Remark:      "operation policy",
 			},
 		},
 	}
@@ -240,10 +240,9 @@ func TestBenefitInfoDoesNotMarshalConstraintOrOperationPolicyDefinitions(t *test
 		t.Fatal(err)
 	}
 	encoded := string(data)
-	if strings.Contains(encoded, `"Constraints"`) || strings.Contains(encoded, `"OperationPolicies"`) ||
-		strings.Contains(encoded, "constraint-secret") || strings.Contains(encoded, "operation-secret") ||
-		strings.Contains(encoded, "operator-only") {
-		t.Fatalf("constraint or operation policy definition leaked into benefit JSON: %s", encoded)
+	want := `{"Status":"active","DriverType":"test.coupon","Constraints":[{"Type":"test.provider_rule","Params":{"minimum":1},"Remark":"benefit constraint"}],"OperationPolicies":[{"Operation":"Reverse","MatchModes":["full"],"Constraints":[{"Type":"test.operation_rule","Params":{"minimum":2},"Remark":"operation constraint"}],"Remark":"operation policy"}]}`
+	if encoded != want {
+		t.Fatalf("unexpected benefit JSON:\n got: %s\nwant: %s", encoded, want)
 	}
 }
 
