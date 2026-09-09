@@ -16,7 +16,6 @@ type DriverRegistry struct {
 type registeredDriverDefinition struct {
 	definition DriverDefinition
 	descriptor DriverDescriptor
-	schema     ConfigSchema
 }
 
 // NewDriverRegistry returns an empty driver registry.
@@ -40,11 +39,6 @@ func (r *DriverRegistry) Register(definition DriverDefinition) error {
 		return err
 	}
 
-	schema := definition.ConfigSchema()
-	if err := schema.Validate(); err != nil {
-		return fmt.Errorf("benefit: invalid driver %q config schema: %w", descriptor.Type, err)
-	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, exists := r.definitions[descriptor.Type]; exists {
@@ -54,7 +48,6 @@ func (r *DriverRegistry) Register(definition DriverDefinition) error {
 	r.definitions[descriptor.Type] = registeredDriverDefinition{
 		definition: definition,
 		descriptor: cloneDriverDescriptor(descriptor),
-		schema:     schema.Clone(),
 	}
 	return nil
 }
@@ -82,7 +75,7 @@ func (r *DriverRegistry) Get(driverType DriverType) (DriverDefinition, bool) {
 // ConfigSchema returns the registered configuration schema snapshot.
 func (r *DriverRegistry) ConfigSchema(driverType DriverType) (ConfigSchema, bool) {
 	if registered, ok := r.get(driverType); ok {
-		return registered.schema.Clone(), true
+		return registered.descriptor.ConfigSchema.Clone(), true
 	}
 	return ConfigSchema{}, false
 }
@@ -99,7 +92,9 @@ func (r *DriverRegistry) get(driverType DriverType) (registeredDriverDefinition,
 	return registered, ok
 }
 
-// Descriptors returns all descriptors sorted by driver type.
+// Descriptors returns a consistent snapshot of all complete descriptors,
+// sorted by driver type. Returned descriptors do not share mutable data
+// with the registry.
 func (r *DriverRegistry) Descriptors() []DriverDescriptor {
 	if r == nil {
 		return nil
@@ -195,6 +190,7 @@ func validateDriverOperation[T any](driver Driver, op Operation) error {
 
 func cloneDriverDescriptor(descriptor DriverDescriptor) DriverDescriptor {
 	descriptor.Operations = cloneOperationCapabilities(descriptor.Operations)
+	descriptor.ConfigSchema = descriptor.ConfigSchema.Clone()
 	return descriptor
 }
 

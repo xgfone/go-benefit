@@ -38,8 +38,16 @@ a stable namespaced value composed from the provider and benefit kind, such as
 two dot-separated segments; each segment uses lower-case letters, digits,
 underscores, or hyphens and must start with a letter or digit.
 
-Management applications use `ConfigSchema` to render configuration forms and
-call `ValidateConfig` before encrypting and persisting operator input. A
+`DriverDefinition.Descriptor()` returns complete driver type metadata, including
+`ConfigSchema` and optional operation capabilities. `DriverRegistry.Descriptors()`
+returns a consistent, independent snapshot of these descriptors sorted by type,
+so management applications can list drivers and their configuration forms in
+one query. For user-facing lists, convert each entry with
+`DriverDescriptor.Descriptor()` to obtain only `Type`, `Name`, and `Icon`.
+`DriverRegistry.ConfigSchema(type)` remains available for individual schema queries.
+
+Management applications use `DriverDescriptor.ConfigSchema` to render configuration
+forms and call `ValidateConfig` before encrypting and persisting operator input. A
 `DriverConfig` is either empty, when the schema permits it, or a UTF-8 JSON
 object. Schemas use JSON Schema Draft 2020-12 and may include UI extensions such
 as `x-secret`. `DriverDefinition.ValidateConfig` is authoritative and must agree

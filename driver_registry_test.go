@@ -160,6 +160,10 @@ func TestDriverDescriptorTypeDescriptor(t *testing.T) {
 
 func TestDriverDescriptorValidation(t *testing.T) {
 	valid := newFakeDefinition("coupon", false, false).Descriptor()
+	if err := valid.Validate(); err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
 		name   string
 		mutate func(*benefit.DriverDescriptor)
@@ -169,6 +173,8 @@ func TestDriverDescriptorValidation(t *testing.T) {
 		{"empty kind", func(d *benefit.DriverDescriptor) { d.Kind.Type = "" }},
 		{"empty provider", func(d *benefit.DriverDescriptor) { d.Provider.Type = "" }},
 		{"mismatched type", func(d *benefit.DriverDescriptor) { d.Type = "other.coupon" }},
+		{"missing config schema", func(d *benefit.DriverDescriptor) { d.ConfigSchema = benefit.ConfigSchema{} }},
+		{"invalid config schema", func(d *benefit.DriverDescriptor) { d.ConfigSchema.Revision = "" }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -178,6 +184,68 @@ func TestDriverDescriptorValidation(t *testing.T) {
 				t.Fatal("invalid descriptor unexpectedly validated")
 			}
 		})
+	}
+}
+
+func TestDriverRegistryDescriptorSnapshot(t *testing.T) {
+	registry := benefit.NewDriverRegistry()
+	definition := newFakeDefinition("coupon", true, true)
+	wantSchema := string(definition.schema.Schema)
+	if err := registry.Register(definition); err != nil {
+		t.Fatal(err)
+	}
+
+	// The registered snapshot must not alias the definition's schema.
+	definition.schema.Schema[0] = '['
+	descriptors := registry.Descriptors()
+	if len(descriptors) != 1 {
+		t.Fatalf("unexpected descriptors: %#v", descriptors)
+	}
+	if got := descriptors[0].ConfigSchema; got.Revision != "v1" || string(got.Schema) != wantSchema {
+		t.Fatalf("unexpected descriptor schema: %#v", got)
+	}
+
+	// Mutating a returned complete descriptor must not change either query.
+	descriptors[0].ConfigSchema.Schema[0] = '['
+	descriptors[0].Operations[0].Modes[0] = "changed"
+	fresh := registry.Descriptors()[0]
+	if string(fresh.ConfigSchema.Schema) != wantSchema ||
+		fresh.Operations[0].Modes[0] != benefit.OperationModeReverseFull {
+		t.Fatal("registered metadata was mutated through a returned descriptor")
+	}
+	schema, ok := registry.ConfigSchema(fresh.Type)
+	if !ok || string(schema.Schema) != wantSchema {
+		t.Fatal("schema query disagrees with the registered descriptor")
+	}
+	schema.Schema[0] = '['
+	if string(registry.Descriptors()[0].ConfigSchema.Schema) != wantSchema {
+		t.Fatal("registered descriptor was mutated through a returned schema")
+	}
+
+	// Replacing a registration must not affect previously returned metadata.
+	registry.Unregister(fresh.Type)
+	replacement := newFakeDefinition("coupon", false, false)
+	replacement.schema.Revision = "v2"
+	if err := registry.Register(replacement); err != nil {
+		t.Fatal(err)
+	}
+	if fresh.ConfigSchema.Revision != "v1" || string(fresh.ConfigSchema.Schema) != wantSchema {
+		t.Fatal("previous descriptor snapshot changed after replacement")
+	}
+	if got := registry.Descriptors()[0].ConfigSchema.Revision; got != "v2" {
+		t.Fatalf("unexpected replacement schema revision: %q", got)
+	}
+}
+
+func TestDriverRegistryRejectsInvalidConfigSchema(t *testing.T) {
+	definition := newFakeDefinition("coupon", false, false)
+	definition.schema.Revision = ""
+	registry := benefit.NewDriverRegistry()
+	if err := registry.Register(definition); err == nil {
+		t.Fatal("driver with invalid config schema unexpectedly registered")
+	}
+	if len(registry.Descriptors()) != 0 {
+		t.Fatal("invalid driver was retained in the registry")
 	}
 }
 
@@ -355,17 +423,13 @@ func (d *fakeDefinition) Descriptor() benefit.DriverDescriptor {
 	return benefit.DriverDescriptor{
 		Type: benefit.DriverType("test." + d.kind),
 		Name: "Test " + d.kind,
-		Provider: benefit.TypeDescriptor{
-			Type: "test",
-			Name: "Test",
-		},
-		Kind:       benefit.TypeDescriptor{Type: d.kind},
-		Operations: operations,
-	}
-}
 
-func (d *fakeDefinition) ConfigSchema() benefit.ConfigSchema {
-	return d.schema.Clone()
+		Kind:     benefit.TypeDescriptor{Type: d.kind},
+		Provider: benefit.TypeDescriptor{Type: "test", Name: "Test"},
+
+		Operations:   operations,
+		ConfigSchema: d.schema,
+	}
 }
 
 func (d *fakeDefinition) ValidateConfig(config benefit.DriverConfig) error {

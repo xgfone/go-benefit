@@ -28,11 +28,14 @@ func (t DriverType) Validate() error {
 // Operations contains the driver type's maximum optional capabilities beyond
 // Inspect, Evaluate, and Redeem, which every Driver supports unconditionally.
 type DriverDescriptor struct {
-	Name       string
-	Type       DriverType
-	Kind       TypeDescriptor
-	Provider   TypeDescriptor
-	Operations OperationCapabilities `json:",omitempty"`
+	Name string
+	Type DriverType
+
+	Kind     TypeDescriptor
+	Provider TypeDescriptor
+
+	Operations   OperationCapabilities `json:",omitempty"`
+	ConfigSchema ConfigSchema
 }
 
 // Descriptor returns the type descriptor of the driver.
@@ -50,7 +53,7 @@ func (d DriverDescriptor) Descriptor() TypeDescriptor {
 	return descriptor
 }
 
-// Validate verifies descriptor identity and declared operations.
+// Validate verifies descriptor identity, config schema and declared operations.
 func (d DriverDescriptor) Validate() error {
 	if err := d.Type.Validate(); err != nil {
 		return err
@@ -73,15 +76,19 @@ func (d DriverDescriptor) Validate() error {
 	if err := d.Operations.Validate(); err != nil {
 		return err
 	}
+	if err := d.ConfigSchema.Validate(); err != nil {
+		return fmt.Errorf("benefit: invalid driver %q config schema: %w", d.Type, err)
+	}
 	return nil
 }
 
 // DriverDefinition describes, validates, and compiles one driver type.
 type DriverDefinition interface {
+	// Descriptor must return equivalent metadata on every call.
+	//
+	// Callers must treat the metadata and all values reachable from it
+	// as immutable.
 	Descriptor() DriverDescriptor
-
-	// ConfigSchema must return an equivalent schema on every call.
-	ConfigSchema() ConfigSchema
 
 	// ValidateConfig validates config without compiling it. It must accept a
 	// configuration if and only if CompileConfig accepts it, must not retain
@@ -118,6 +125,9 @@ type Driver interface {
 	// Descriptor returns the global, configuration-independent metadata of
 	// the driver type. The returned value must match the DriverDefinition
 	// that constructed the driver.
+	//
+	// Callers must treat the metadata and all values reachable from it
+	// as immutable.
 	Descriptor() DriverDescriptor
 
 	Inspect(ctx context.Context, req InspectRequest) (info BenefitInfo, err error)

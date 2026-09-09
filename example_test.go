@@ -33,27 +33,20 @@ func (exampleDriverDefinition) Descriptor() benefit.DriverDescriptor {
 	return benefit.DriverDescriptor{
 		Name: "Example coupon",
 		Type: exampleDriverType,
-		Provider: benefit.TypeDescriptor{
-			Type: "example",
-			Name: "Example provider",
-		},
-		Kind: benefit.TypeDescriptor{
-			Type: "coupon",
-			Name: "Coupon",
-		},
+
+		Kind:     benefit.TypeDescriptor{Type: "coupon", Name: "Coupon"},
+		Provider: benefit.TypeDescriptor{Type: "example", Name: "Example provider"},
+
 		Operations: benefit.OperationCapabilities{
 			benefit.OperationCapability{
 				Operation: benefit.OperationReverse,
 				Modes:     []benefit.OperationMode{benefit.OperationModeReverseFull},
 			},
 		},
-	}
-}
 
-func (exampleDriverDefinition) ConfigSchema() benefit.ConfigSchema {
-	return benefit.ConfigSchema{
-		Revision: "v1",
-		Schema: json.RawMessage(`{
+		ConfigSchema: benefit.ConfigSchema{
+			Revision: "v1",
+			Schema: json.RawMessage(`{
 			"$schema":"https://json-schema.org/draft/2020-12/schema",
 			"type":"object",
 			"properties":{
@@ -65,6 +58,7 @@ func (exampleDriverDefinition) ConfigSchema() benefit.ConfigSchema {
 			"required":["token","merchant_id","minimum_amount","discount_amount"],
 			"additionalProperties":false
 		}`),
+		},
 	}
 }
 
