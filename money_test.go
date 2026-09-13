@@ -275,7 +275,7 @@ func TestResolveStatusPrecedence(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := benefit.ResolveStatus(test.facts, now); got != test.want {
+			if got := benefit.ResolveStatus(now, test.facts); got != test.want {
 				t.Fatalf("got %q, want %q", got, test.want)
 			}
 		})

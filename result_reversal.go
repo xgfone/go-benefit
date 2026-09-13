@@ -42,8 +42,8 @@ type Reversal struct {
 	ReversalId         string `json:",omitempty"`
 	ProviderReversalId string `json:",omitempty"`
 
-	Outcome    ReversalOutcome `json:",omitzero"`
 	ReversedAt time.Time       `json:",omitzero"`
+	Outcome    ReversalOutcome `json:",omitzero"`
 
 	// ProviderData contains opaque provider-specific data for this confirmed
 	// reversal operation.

@@ -43,8 +43,8 @@ type Redemption struct {
 	RedemptionId         string `json:",omitempty"`
 	ProviderRedemptionId string `json:",omitempty"`
 
-	Outcome    BenefitOutcome `json:",omitzero"`
 	RedeemedAt time.Time      `json:",omitzero"`
+	Outcome    BenefitOutcome `json:",omitzero"`
 
 	// ProviderData contains opaque provider-specific data for this confirmed
 	// redemption operation.
