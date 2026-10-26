@@ -127,20 +127,20 @@ func TestBenefitRestorationValidation(t *testing.T) {
 		t.Fatal("zero benefit restoration was not reported as zero")
 	}
 
-	explicitZero := benefit.BenefitRestoration{Amount: &benefit.Money{}}
+	explicitZero := benefit.BenefitRestoration{Money: &benefit.Money{}}
 	if explicitZero.IsZero() {
 		t.Fatal("explicit zero restoration was reported as absent")
 	}
 	if err := explicitZero.Validate(); err != nil {
 		t.Fatalf("explicit zero restoration failed: %v", err)
 	}
-	inheritedCurrency := benefit.BenefitRestoration{Amount: &benefit.Money{Amount: 2000}}
+	inheritedCurrency := benefit.BenefitRestoration{Money: &benefit.Money{Amount: 2000}}
 	if err := inheritedCurrency.Validate(); err != nil {
 		t.Fatalf("restoration with inherited currency failed: %v", err)
 	}
 
 	valid := benefit.BenefitRestoration{
-		Amount: &benefit.Money{Amount: 2000, Currency: "CNY"},
+		Money: &benefit.Money{Amount: 2000, Currency: "CNY"},
 	}
 	if valid.IsZero() {
 		t.Fatal("non-zero benefit restoration was reported as zero")
@@ -150,8 +150,8 @@ func TestBenefitRestorationValidation(t *testing.T) {
 	}
 
 	invalid := []benefit.BenefitRestoration{
-		{Amount: &benefit.Money{Amount: 1, Currency: "US1"}},
-		{Amount: &benefit.Money{Amount: -1, Currency: "CNY"}},
+		{Money: &benefit.Money{Amount: 1, Currency: "US1"}},
+		{Money: &benefit.Money{Amount: -1, Currency: "CNY"}},
 	}
 	for _, restoration := range invalid {
 		if err := restoration.Validate(); err == nil {
@@ -174,7 +174,7 @@ func TestReversalOutcomeValidation(t *testing.T) {
 			PayableAmount:  10000,
 		}},
 		Restored: benefit.BenefitRestoration{
-			Amount: &benefit.Money{Amount: 2000, Currency: "CNY"},
+			Money: &benefit.Money{Amount: 2000, Currency: "CNY"},
 		},
 	}
 	if valid.IsZero() {
@@ -191,7 +191,7 @@ func TestReversalOutcomeValidation(t *testing.T) {
 	}
 
 	invalidRestored := valid
-	invalidRestored.Restored.Amount = &benefit.Money{Amount: -1, Currency: "CNY"}
+	invalidRestored.Restored.Money = &benefit.Money{Amount: -1, Currency: "CNY"}
 	if err := invalidRestored.Validate(); err == nil {
 		t.Fatal("invalid restored outcome unexpectedly validated")
 	}

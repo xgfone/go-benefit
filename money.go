@@ -39,10 +39,10 @@ const (
 type DiscountEffect struct {
 	Type DiscountEffectType
 
-	Currency       string `json:",omitempty"`
-	OriginalAmount int64  `json:",omitempty"`
-	DiscountAmount int64  `json:",omitempty"`
-	PayableAmount  int64  `json:",omitempty"`
+	Currency       string `json:",omitzero"`
+	OriginalAmount int64  `json:",omitzero"`
+	DiscountAmount int64  `json:",omitzero"`
+	PayableAmount  int64  `json:",omitzero"`
 }
 
 // Validate verifies the optional effect currency and amounts.

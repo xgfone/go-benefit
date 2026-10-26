@@ -13,7 +13,7 @@ type TypeDescriptor struct {
 type Usage struct {
 	RedeemedCount  int64
 	RemainingCount int64
-	Unlimited      bool `json:",omitempty"`
+	Unlimited      bool `json:",omitzero"`
 }
 
 // NoticeLevel controls how a human-facing notice should be presented.

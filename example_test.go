@@ -2,7 +2,8 @@ package benefit_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"time"
@@ -46,7 +47,7 @@ func (exampleDriverDefinition) Descriptor() benefit.DriverDescriptor {
 
 		ConfigSchema: benefit.ConfigSchema{
 			Revision: "v1",
-			Schema: json.RawMessage(`{
+			Schema: jsontext.Value(`{
 			"$schema":"https://json-schema.org/draft/2020-12/schema",
 			"type":"object",
 			"properties":{
@@ -289,7 +290,7 @@ func (d *exampleCouponDriver) Reverse(
 			ProviderReversalId:   "provider-" + request.ReversalId,
 			Outcome: benefit.ReversalOutcome{
 				Restored: benefit.BenefitRestoration{
-					Amount: &benefit.Money{
+					Money: &benefit.Money{
 						Amount:   d.config.DiscountAmount,
 						Currency: "CNY",
 					},

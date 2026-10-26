@@ -45,10 +45,10 @@ type OperationCapabilities []OperationCapability
 // A policy must either set Disabled or provide Constraints, but not both.
 type OperationPolicy struct {
 	Operation   Operation
-	MatchModes  []OperationMode `json:",omitempty"`
-	Constraints Constraints     `json:",omitempty"`
-	Remark      string          `json:",omitempty"`
-	Disabled    bool            `json:",omitempty"`
+	MatchModes  []OperationMode `json:",omitzero"`
+	Constraints Constraints     `json:",omitzero"`
+	Remark      string          `json:",omitzero"`
+	Disabled    bool            `json:",omitzero"`
 }
 
 // OperationPolicies is an ordered list of benefit-specific operation policies.

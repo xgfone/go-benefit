@@ -65,10 +65,10 @@ type RedeemResult struct {
 	Status ResultStatus
 
 	// Failure
-	Failure *RedeemFailure `json:",omitempty"`
+	Failure *RedeemFailure `json:",omitzero"`
 
 	// Success
-	Redemption *Redemption `json:",omitempty"`
+	Redemption *Redemption `json:",omitzero"`
 }
 
 // Validate verifies the status payload invariant.

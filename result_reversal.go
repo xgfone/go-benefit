@@ -60,10 +60,10 @@ type ReverseResult struct {
 	Status ResultStatus
 
 	// Failure
-	Failure *ReversalFailure `json:",omitempty"`
+	Failure *ReversalFailure `json:",omitzero"`
 
 	// Success
-	Reversal *Reversal `json:",omitempty"`
+	Reversal *Reversal `json:",omitzero"`
 }
 
 // Validate verifies the reversal status payload invariant.

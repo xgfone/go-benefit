@@ -6,7 +6,7 @@ import "errors"
 // benefit. Additional normalized outcome categories can be added without
 // changing driver operation signatures.
 type BenefitOutcome struct {
-	Discount *DiscountEffect `json:",omitempty"`
+	Discount *DiscountEffect `json:",omitzero"`
 }
 
 // IsZero reports whether no normalized outcome is present.
@@ -25,28 +25,31 @@ func (o BenefitOutcome) Validate() error {
 // BenefitRestoration describes benefit resources made available again by a
 // confirmed reversal.
 type BenefitRestoration struct {
-	// Amount is a restored monetary balance or allowance; it is distinct from
+	// Money is a restored monetary balance or allowance; it is distinct from
 	// the transaction value described by BenefitOutcome.
 	//
-	// A nil Amount means none was supplied; a non-nil pointer distinguishes
+	// A nil Money means none was supplied; a non-nil pointer distinguishes
 	// an explicit zero amount from a non-zero amount. An amount with an empty
 	// Currency first inherits Reversed.Discount.Currency when present, then
 	// the transaction currency.
-	Amount *Money `json:",omitempty"`
+	//
+	// Use omitempty: omitzero would call Money.IsZero and erase an explicitly
+	// supplied zero monetary restoration.
+	Money *Money `json:",omitempty"`
 }
 
 // IsZero reports whether no normalized restoration is present.
 func (r BenefitRestoration) IsZero() bool {
-	return r.Amount == nil
+	return r.Money == nil
 }
 
 // Validate verifies every normalized restoration component that is present.
 func (r BenefitRestoration) Validate() error {
-	if r.Amount != nil {
-		if err := r.Amount.Validate(); err != nil {
+	if r.Money != nil {
+		if err := r.Money.Validate(); err != nil {
 			return err
 		}
-		if r.Amount.Amount < 0 {
+		if r.Money.Amount < 0 {
 			return errors.New("benefit: restored amount must not be negative")
 		}
 	}

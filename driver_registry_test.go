@@ -2,7 +2,8 @@ package benefit_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"strings"
 	"sync/atomic"
@@ -91,16 +92,16 @@ func TestDriverRegistry(t *testing.T) {
 func TestConfigSchemaValidation(t *testing.T) {
 	const dialect = `"$schema":"https://json-schema.org/draft/2020-12/schema"`
 	tests := map[string]benefit.ConfigSchema{
-		"empty revision":       {Schema: json.RawMessage(`{` + dialect + `,"type":"object"}`)},
+		"empty revision":       {Schema: jsontext.Value(`{` + dialect + `,"type":"object"}`)},
 		"empty document":       {Revision: "v1"},
-		"invalid JSON":         {Revision: "v1", Schema: json.RawMessage(`{`)},
-		"non-object document":  {Revision: "v1", Schema: json.RawMessage(`null`)},
-		"missing dialect":      {Revision: "v1", Schema: json.RawMessage(`{"type":"object"}`)},
-		"non-string dialect":   {Revision: "v1", Schema: json.RawMessage(`{"$schema":1,"type":"object"}`)},
-		"unsupported dialect":  {Revision: "v1", Schema: json.RawMessage(`{"$schema":"other","type":"object"}`)},
-		"missing root type":    {Revision: "v1", Schema: json.RawMessage(`{` + dialect + `}`)},
-		"non-string root type": {Revision: "v1", Schema: json.RawMessage(`{` + dialect + `,"type":1}`)},
-		"non-object root type": {Revision: "v1", Schema: json.RawMessage(`{` + dialect + `,"type":"array"}`)},
+		"invalid JSON":         {Revision: "v1", Schema: jsontext.Value(`{`)},
+		"non-object document":  {Revision: "v1", Schema: jsontext.Value(`null`)},
+		"missing dialect":      {Revision: "v1", Schema: jsontext.Value(`{"type":"object"}`)},
+		"non-string dialect":   {Revision: "v1", Schema: jsontext.Value(`{"$schema":1,"type":"object"}`)},
+		"unsupported dialect":  {Revision: "v1", Schema: jsontext.Value(`{"$schema":"other","type":"object"}`)},
+		"missing root type":    {Revision: "v1", Schema: jsontext.Value(`{` + dialect + `}`)},
+		"non-string root type": {Revision: "v1", Schema: jsontext.Value(`{` + dialect + `,"type":1}`)},
+		"non-object root type": {Revision: "v1", Schema: jsontext.Value(`{` + dialect + `,"type":"array"}`)},
 	}
 	for name, schema := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -361,6 +362,8 @@ func TestDriverConfigValidation(t *testing.T) {
 
 	invalidUtf8 := benefit.DriverConfig(string([]byte{'{', '"', 0xff, '"', ':', '1', '}'}))
 	invalid := []benefit.DriverConfig{
+		`{"key":1,"key":2}`,
+		`{"nested":{"key":1,"key":2}}`,
 		"  \n\t",
 		"null",
 		"[]",
@@ -396,7 +399,7 @@ func newFakeDefinition(kind string, declareReverse, driverHasReverse bool) *fake
 		driverHasReverse: driverHasReverse,
 		schema: benefit.ConfigSchema{
 			Revision: "v1",
-			Schema: json.RawMessage(`{
+			Schema: jsontext.Value(`{
                 "$schema":"https://json-schema.org/draft/2020-12/schema",
                 "type":"object",
                 "additionalProperties":false,

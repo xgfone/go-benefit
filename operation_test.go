@@ -2,7 +2,7 @@ package benefit_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"strings"
 	"testing"
 	"time"
@@ -471,10 +471,10 @@ func TestMutationRecordValidation(t *testing.T) {
 			Reversed: benefit.BenefitOutcome{Discount: &benefit.DiscountEffect{Type: "invalid"}},
 		}}},
 		{"with invalid restored currency", benefit.Reversal{Outcome: benefit.ReversalOutcome{
-			Restored: benefit.BenefitRestoration{Amount: &benefit.Money{Amount: 1, Currency: "US1"}},
+			Restored: benefit.BenefitRestoration{Money: &benefit.Money{Amount: 1, Currency: "US1"}},
 		}}},
 		{"with negative restored amount", benefit.Reversal{Outcome: benefit.ReversalOutcome{
-			Restored: benefit.BenefitRestoration{Amount: &benefit.Money{Amount: -1, Currency: "USD"}},
+			Restored: benefit.BenefitRestoration{Money: &benefit.Money{Amount: -1, Currency: "USD"}},
 		}}},
 	}
 	for _, test := range reversals {

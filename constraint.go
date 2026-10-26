@@ -2,7 +2,8 @@ package benefit
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"
@@ -29,8 +30,8 @@ func (t ConstraintType) Validate() error {
 // Constraint is a typed, self-contained rule definition.
 type Constraint struct {
 	Type   ConstraintType
-	Params json.RawMessage `json:",omitempty"`
-	Remark string          `json:",omitempty"`
+	Params jsontext.Value `json:",omitempty"`
+	Remark string         `json:",omitempty"`
 }
 
 // Constraints is an ordered list of constraint definitions.
@@ -42,7 +43,7 @@ func NewConstraint(typ ConstraintType, remark string, params any) (Constraint, e
 		return Constraint{}, errors.New("benefit: constraint type is empty")
 	}
 
-	var raw json.RawMessage
+	var raw jsontext.Value
 	if params != nil {
 		data, err := json.Marshal(params)
 		if err != nil {
@@ -165,7 +166,7 @@ type ConstraintReport struct {
 	Status     ConstraintReportStatus
 	Violations []ConstraintDecision `json:",omitempty"`
 
-	Unrecognized int `json:",omitempty"`
+	Unrecognized int `json:",omitzero"`
 }
 
 // IsZero reports whether the report contains no status, violations, or

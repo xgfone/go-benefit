@@ -155,18 +155,29 @@ perform precision or exchange-rate conversion.
 ## Outcomes and mutation results
 
 `BenefitOutcome` describes the value projected by Evaluate or confirmed by
-Redeem. Its current normalized component is an optional monetary discount; the
-container can gain grant or fulfillment components without changing driver
-method signatures.
+Redeem. Its current normalized component is an optional monetary `Discount`.
+Non-monetary outcome models are intentionally deferred. Future outcome categories
+can be added as optional fields and new types without changing the existing
+driver operation signatures or the meaning of `Discount`.
+
+Use keyed struct literals for public models and tolerate unknown optional JSON
+fields when integrating the protocol. A missing `Discount` means no monetary
+component was supplied; price-only consumers must reject it rather than treating
+it as a zero-price or free transaction. Supporting future outcome categories
+will still require the consuming application to implement their business logic.
 
 `ReversalOutcome` separately describes what a confirmed Reverse undid and what
 benefit resources it restored. `Reversed` contains the part of the delivered
-`BenefitOutcome` that was undone, while `Restored` contains a
-`BenefitRestoration`. Its current normalized component is an optional monetary
-balance or allowance. These values are intentionally separate: undoing a
-transaction effect does not necessarily make the consumed benefit resource
-available again, and restoring a benefit does not imply a monetary refund.
-The restored amount is not required to equal the reversed discount amount.
+`BenefitOutcome` that was undone, while `Restored` contains a `BenefitRestoration`.
+Its optional `Money` field records a restored monetary balance or allowance.
+These values are intentionally separate: undoing a transaction effect does not
+necessarily make the consumed benefit resource available again, and restoring a
+benefit does not imply a monetary refund. The restored amount is not required to
+equal the reversed discount amount. Usage counters belong to the driver's resource
+model. This package does not currently define a generic restored count, quantity,
+unit, or fractional-resource model. Additional resource-specific restoration
+components can be introduced when their semantics are established without
+changing operation signatures.
 
 All monetary values use integer minor units. Major/minor-unit conversion,
 currency precision, exchange rates, and validation against the assigned ISO
@@ -174,6 +185,13 @@ currency precision, exchange rates, and validation against the assigned ISO
 currency registry. A non-empty `Currency` must have the three-ASCII-letter ISO
 4217 form. Input and comparison are case-insensitive, while applications and
 drivers should emit the canonical upper-case form.
+
+`CalculateAmountDiscount` checks a fixed amount and its currency against the
+transaction before consumption. It rejects face values greater than the original
+amount; a driver that caps face value must do so explicitly. The original amount
+must be supplied even when it is zero. `CalculatePercentageDiscount` accepts
+integer basis points of the amount saved (1000 saves 10%, 10000 is free), rounds
+down to minor units, and avoids floating-point arithmetic and integer overflow.
 
 The meaning of an empty currency is field-specific and documented on its
 containing type. Drivers should resolve and emit currencies on durable outcomes

@@ -1,7 +1,8 @@
 package benefit_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"strings"
 	"testing"
 	"time"
@@ -88,7 +89,7 @@ func TestModelsOmitZeroValues(t *testing.T) {
 		})
 	}
 
-	reversal.Outcome.Restored.Amount = &benefit.Money{}
+	reversal.Outcome.Restored.Money = &benefit.Money{}
 	if err := reversal.Validate(); err != nil {
 		t.Fatalf("explicit zero restored amount failed validation: %v", err)
 	}
@@ -117,7 +118,7 @@ func TestMutationProviderDataJSONPlacement(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var fields map[string]json.RawMessage
+			var fields map[string]jsontext.Value
 			if err := json.Unmarshal(data, &fields); err != nil {
 				t.Fatal(err)
 			}
@@ -213,7 +214,7 @@ func TestRequestJsonOmitsInProcessValues(t *testing.T) {
 func TestBenefitInfoMarshalsConstraintAndOperationPolicyDefinitions(t *testing.T) {
 	operationConstraint := benefit.Constraint{
 		Type:   "test.operation_rule",
-		Params: json.RawMessage(`{"minimum":2}`),
+		Params: jsontext.Value(`{"minimum":2}`),
 		Remark: "operation constraint",
 	}
 	value := benefit.BenefitInfo{
@@ -222,7 +223,7 @@ func TestBenefitInfoMarshalsConstraintAndOperationPolicyDefinitions(t *testing.T
 		Constraints: benefit.Constraints{
 			{
 				Type:   "test.provider_rule",
-				Params: json.RawMessage(`{"minimum":1}`),
+				Params: jsontext.Value(`{"minimum":1}`),
 				Remark: "benefit constraint",
 			},
 		},
@@ -386,6 +387,73 @@ func TestDefaultConstraintRegistryContents(t *testing.T) {
 	for _, typ := range types {
 		if !strings.HasPrefix(string(typ), "benefit.") {
 			t.Fatalf("built-in constraint type is not namespaced: %q", typ)
+		}
+	}
+}
+
+func TestBenefitRestorationMoneyJSON(t *testing.T) {
+	for _, test := range []struct {
+		restoration benefit.BenefitRestoration
+		want        string
+	}{
+		{benefit.BenefitRestoration{}, `{}`},
+		{benefit.BenefitRestoration{Money: &benefit.Money{}}, `{"Money":{"Amount":0}}`},
+		{benefit.BenefitRestoration{Money: &benefit.Money{Amount: 2000, Currency: "CNY"}}, `{"Money":{"Amount":2000,"Currency":"CNY"}}`},
+	} {
+		data, err := json.Marshal(test.restoration)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(data) != test.want {
+			t.Fatalf("encoded %s, want %s", data, test.want)
+		}
+		var decoded benefit.BenefitRestoration
+		if err = json.Unmarshal(data, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if (decoded.Money == nil) != (test.restoration.Money == nil) {
+			t.Fatal("lost explicit monetary restoration")
+		}
+		if decoded.Money != nil && *decoded.Money != *test.restoration.Money {
+			t.Fatal("monetary restoration changed")
+		}
+	}
+}
+
+func TestMutationJSONPreservesPayloadPresence(t *testing.T) {
+	for _, original := range []benefit.RedeemResult{
+		{Status: benefit.ResultStatusSuccess, Redemption: &benefit.Redemption{}},
+		{Status: benefit.ResultStatusFailure, Failure: &benefit.RedeemFailure{}},
+	} {
+		data, err := json.Marshal(original)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var decoded benefit.RedeemResult
+		if err = json.Unmarshal(data, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if err = decoded.Validate(); err != nil {
+			t.Fatalf("lost payload in %s: %v", data, err)
+		}
+	}
+
+	for _, original := range []benefit.ReverseResult{
+		{Status: benefit.ResultStatusSuccess, Reversal: &benefit.Reversal{}},
+		{Status: benefit.ResultStatusFailure, Failure: &benefit.ReversalFailure{}},
+	} {
+		data, err := json.Marshal(original)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var decoded benefit.ReverseResult
+		if err = json.Unmarshal(data, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if err = decoded.Validate(); err != nil {
+			t.Fatalf("lost payload in %s: %v", data, err)
 		}
 	}
 }

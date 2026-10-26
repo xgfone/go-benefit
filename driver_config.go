@@ -2,7 +2,8 @@ package benefit
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"strings"
@@ -37,7 +38,7 @@ func (c DriverConfig) Validate() error {
 		return errors.New("benefit: driver config is not a JSON object")
 	}
 
-	var object map[string]json.RawMessage
+	var object map[string]jsontext.Value
 	if err := json.Unmarshal([]byte(value), &object); err != nil {
 		return fmt.Errorf("benefit: driver config is not a JSON object: %w", err)
 	}
@@ -48,9 +49,9 @@ func (c DriverConfig) Validate() error {
 // ConfigSchema describes versioned configuration form and validation metadata.
 // DriverDefinition validation and compilation remain authoritative.
 type ConfigSchema struct {
-	Optional bool `json:",omitempty"`
+	Optional bool `json:",omitzero"`
 	Revision string
-	Schema   json.RawMessage
+	Schema   jsontext.Value
 }
 
 // Clone returns a copy whose JSON Schema document does not alias the original.
@@ -68,7 +69,7 @@ func (s ConfigSchema) Validate() error {
 		return errors.New("benefit: config schema document is empty")
 	}
 
-	var root map[string]json.RawMessage
+	var root map[string]jsontext.Value
 	if err := json.Unmarshal(s.Schema, &root); err != nil {
 		return fmt.Errorf("benefit: config schema document is invalid: %w", err)
 	}

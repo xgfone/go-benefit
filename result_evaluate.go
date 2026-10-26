@@ -2,6 +2,7 @@ package benefit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -34,13 +35,37 @@ type EvaluationResult struct {
 	Constraints ConstraintReport `json:",omitzero"`
 
 	// Failure
-	Failure *EvaluationFailure `json:",omitempty"`
+	Failure *EvaluationFailure `json:",omitzero"`
 
 	// Success
 	Outcome BenefitOutcome `json:",omitzero"`
 
 	ExpiresAt       time.Time `json:",omitzero"`
 	EvaluationToken string    `json:",omitempty"`
+}
+
+// Validate verifies eligibility and payload consistency. An unevaluated
+// constraint report is permitted for provider-authoritative evaluations.
+func (r EvaluationResult) Validate() error {
+	if r.Eligible {
+		if r.Failure != nil {
+			return errors.New("benefit: eligible evaluation has a failure")
+		}
+		if r.Constraints.Status == ConstraintReportStatusUnsatisfied {
+			return errors.New("benefit: eligible evaluation has unsatisfied constraints")
+		}
+		return r.Outcome.Validate()
+	}
+
+	if r.Failure == nil || r.Failure.Code == "" {
+		return errors.New("benefit: ineligible evaluation has no failure code")
+	}
+
+	if !r.Outcome.IsZero() {
+		return errors.New("benefit: ineligible evaluation has an outcome")
+	}
+
+	return nil
 }
 
 // EvaluateLocalEligibility applies normalized status and constraints.
