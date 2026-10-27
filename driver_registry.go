@@ -194,20 +194,24 @@ func cloneDriverDescriptor(descriptor DriverDescriptor) DriverDescriptor {
 	return descriptor
 }
 
-// DefaultDriverRegistry is the package-level driver registry.
-var DefaultDriverRegistry = NewDriverRegistry()
+var defaultDriverRegistry = NewDriverRegistry()
+
+// DefaultDriverRegistry is the package-level default driver registry.
+func DefaultDriverRegistry() *DriverRegistry {
+	return defaultDriverRegistry
+}
 
 // RegisterDriver registers a definition in the package-level registry.
 func RegisterDriver(definition DriverDefinition) error {
-	return DefaultDriverRegistry.Register(definition)
+	return defaultDriverRegistry.Register(definition)
 }
 
 // ValidateDriverConfig validates configuration with the package-level registry.
 func ValidateDriverConfig(driverType DriverType, config DriverConfig) error {
-	return DefaultDriverRegistry.ValidateConfig(driverType, config)
+	return defaultDriverRegistry.ValidateConfig(driverType, config)
 }
 
 // BindDriver constructs a driver from the package-level registry.
 func BindDriver(driverType DriverType, config DriverConfig) (Driver, error) {
-	return DefaultDriverRegistry.Bind(driverType, config)
+	return defaultDriverRegistry.Bind(driverType, config)
 }
