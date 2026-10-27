@@ -1,4 +1,4 @@
-package benefit_test
+package driver_test
 
 import (
 	"context"
@@ -9,13 +9,39 @@ import (
 	"sync/atomic"
 	"testing"
 
-	benefit "github.com/xgfone/go-benefit"
+	"github.com/xgfone/go-benefit"
+	"github.com/xgfone/go-benefit/driver"
 )
 
 const validDriverConfig = benefit.DriverConfig(`{"token":"secret"}`)
 
+func TestDefaultRegistryHelpers(t *testing.T) {
+	definition := newFakeDefinition("default_registry", false, false)
+	typ := definition.Descriptor().Type
+	if err := driver.Register(definition); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { driver.DefaultRegistry().Unregister(typ) })
+	if got, ok := driver.DefaultRegistry().Get(typ); !ok || got != definition {
+		t.Fatal("package helpers and default registry disagree on registrations")
+	}
+	if err := driver.ValidateConfig(typ, validDriverConfig); err != nil {
+		t.Fatal(err)
+	}
+	bound, err := driver.Bind(typ, validDriverConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bound.Descriptor().Type != typ {
+		t.Fatalf("unexpected bound driver type: %q", bound.Descriptor().Type)
+	}
+	if _, ok := driver.NewRegistry().Get(typ); ok {
+		t.Fatal("independent registry inherited the default registrations")
+	}
+}
+
 func TestDriverRegistry(t *testing.T) {
-	registry := benefit.NewDriverRegistry()
+	registry := driver.NewRegistry()
 	definition := newFakeDefinition("coupon", true, true)
 	if err := registry.Register(definition); err != nil {
 		t.Fatal(err)
@@ -89,31 +115,8 @@ func TestDriverRegistry(t *testing.T) {
 	}
 }
 
-func TestConfigSchemaValidation(t *testing.T) {
-	const dialect = `"$schema":"https://json-schema.org/draft/2020-12/schema"`
-	tests := map[string]benefit.ConfigSchema{
-		"empty revision":       {Schema: jsontext.Value(`{` + dialect + `,"type":"object"}`)},
-		"empty document":       {Revision: "v1"},
-		"invalid JSON":         {Revision: "v1", Schema: jsontext.Value(`{`)},
-		"non-object document":  {Revision: "v1", Schema: jsontext.Value(`null`)},
-		"missing dialect":      {Revision: "v1", Schema: jsontext.Value(`{"type":"object"}`)},
-		"non-string dialect":   {Revision: "v1", Schema: jsontext.Value(`{"$schema":1,"type":"object"}`)},
-		"unsupported dialect":  {Revision: "v1", Schema: jsontext.Value(`{"$schema":"other","type":"object"}`)},
-		"missing root type":    {Revision: "v1", Schema: jsontext.Value(`{` + dialect + `}`)},
-		"non-string root type": {Revision: "v1", Schema: jsontext.Value(`{` + dialect + `,"type":1}`)},
-		"non-object root type": {Revision: "v1", Schema: jsontext.Value(`{` + dialect + `,"type":"array"}`)},
-	}
-	for name, schema := range tests {
-		t.Run(name, func(t *testing.T) {
-			if err := schema.Validate(); err == nil {
-				t.Fatal("invalid config schema unexpectedly validated")
-			}
-		})
-	}
-}
-
 func TestDriverRegistryRejectsMissingOptionalCapability(t *testing.T) {
-	registry := benefit.NewDriverRegistry()
+	registry := driver.NewRegistry()
 	definition := newFakeDefinition("missing_reverser", true, false)
 	if err := registry.Register(definition); err != nil {
 		t.Fatal(err)
@@ -131,7 +134,7 @@ func TestDriverRegistryRejectsDeclaredCoreOperation(t *testing.T) {
 	} {
 		definition := newFakeDefinition("declared_"+strings.ToLower(string(operation)), false, false)
 		definition.declareCoreOperation = operation
-		if err := benefit.NewDriverRegistry().Register(definition); err == nil {
+		if err := driver.NewRegistry().Register(definition); err == nil {
 			t.Fatalf("driver with declared core operation %q unexpectedly registered", operation)
 		}
 	}
@@ -189,7 +192,7 @@ func TestDriverDescriptorValidation(t *testing.T) {
 }
 
 func TestDriverRegistryDescriptorSnapshot(t *testing.T) {
-	registry := benefit.NewDriverRegistry()
+	registry := driver.NewRegistry()
 	definition := newFakeDefinition("coupon", true, true)
 	wantSchema := string(definition.schema.Schema)
 	if err := registry.Register(definition); err != nil {
@@ -241,7 +244,7 @@ func TestDriverRegistryDescriptorSnapshot(t *testing.T) {
 func TestDriverRegistryRejectsInvalidConfigSchema(t *testing.T) {
 	definition := newFakeDefinition("coupon", false, false)
 	definition.schema.Revision = ""
-	registry := benefit.NewDriverRegistry()
+	registry := driver.NewRegistry()
 	if err := registry.Register(definition); err == nil {
 		t.Fatal("driver with invalid config schema unexpectedly registered")
 	}
@@ -251,7 +254,7 @@ func TestDriverRegistryRejectsInvalidConfigSchema(t *testing.T) {
 }
 
 func TestNilDriverRegistryAndFactory(t *testing.T) {
-	var registry *benefit.DriverRegistry
+	var registry *driver.Registry
 	if err := registry.Register(nil); err == nil {
 		t.Fatal("nil registry unexpectedly accepted a definition")
 	}
@@ -261,12 +264,12 @@ func TestNilDriverRegistryAndFactory(t *testing.T) {
 	if _, ok := registry.Get("test.coupon"); ok {
 		t.Fatal("nil registry unexpectedly returned a definition")
 	}
-	if err := benefit.NewDriverRegistry().Register(nil); err == nil {
+	if err := driver.NewRegistry().Register(nil); err == nil {
 		t.Fatal("nil driver definition unexpectedly registered")
 	}
 	definition := newFakeDefinition("nil_factory", false, false)
 	definition.nilFactory = true
-	registry = benefit.NewDriverRegistry()
+	registry = driver.NewRegistry()
 	if err := registry.Register(definition); err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +279,7 @@ func TestNilDriverRegistryAndFactory(t *testing.T) {
 
 	definition = newFakeDefinition("nil_driver", false, false)
 	definition.nilDriver = true
-	registry = benefit.NewDriverRegistry()
+	registry = driver.NewRegistry()
 	if err := registry.Register(definition); err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +289,7 @@ func TestNilDriverRegistryAndFactory(t *testing.T) {
 }
 
 func TestRequiredDriverConfigRejectsEmpty(t *testing.T) {
-	registry := benefit.NewDriverRegistry()
+	registry := driver.NewRegistry()
 	definition := newFakeDefinition("required_config", false, false)
 	if err := registry.Register(definition); err != nil {
 		t.Fatal(err)
@@ -307,7 +310,7 @@ func TestRequiredDriverConfigRejectsEmpty(t *testing.T) {
 }
 
 func TestOptionalDriverConfig(t *testing.T) {
-	registry := benefit.NewDriverRegistry()
+	registry := driver.NewRegistry()
 	definition := newFakeDefinition("optional_config", false, false)
 	definition.schema.Optional = true
 	if err := registry.Register(definition); err != nil {
@@ -341,41 +344,6 @@ func TestOptionalDriverConfig(t *testing.T) {
 			definition.compileCalls.Load(),
 			definition.factoryCalls.Load(),
 		)
-	}
-}
-
-func TestDriverConfigValidation(t *testing.T) {
-	valid := []benefit.DriverConfig{
-		"",
-		`{}`,
-		`{"token":"secret"}`,
-		"  {\n\t\"enabled\": true\n  }  ",
-	}
-	for _, config := range valid {
-		if err := config.Validate(); err != nil {
-			t.Fatalf("valid config %q failed: %v", config, err)
-		}
-	}
-	if !benefit.DriverConfig("").IsZero() || benefit.DriverConfig(" \n").IsZero() {
-		t.Fatal("driver config zero detection is incorrect")
-	}
-
-	invalidUtf8 := benefit.DriverConfig(string([]byte{'{', '"', 0xff, '"', ':', '1', '}'}))
-	invalid := []benefit.DriverConfig{
-		`{"key":1,"key":2}`,
-		`{"nested":{"key":1,"key":2}}`,
-		"  \n\t",
-		"null",
-		"[]",
-		`"value"`,
-		`{"token":`,
-		`{} {}`,
-		invalidUtf8,
-	}
-	for _, config := range invalid {
-		if err := config.Validate(); err == nil {
-			t.Fatalf("invalid config %q unexpectedly validated", config)
-		}
 	}
 }
 

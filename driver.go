@@ -98,8 +98,8 @@ type DriverDefinition interface {
 	ValidateConfig(conf DriverConfig) (err error)
 
 	// CompileConfig validates, parses, and compiles config independently
-	// of ValidateConfig, which DriverRegistry.Bind does not call. It is
-	// a deterministic, local operation: equal configurations must produce
+	// of ValidateConfig, which registry binding does not call. It is a
+	// deterministic, local operation: equal configurations must produce
 	// equivalent factories or errors without network or time dependencies.
 	// Implementations and proxies may cache and reuse compiled factories
 	// or drivers for equal configurations.

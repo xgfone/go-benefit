@@ -1,7 +1,6 @@
 package benefit
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -16,6 +15,20 @@ const (
 	OperationRedeem   Operation = "Redeem"
 	OperationReverse  Operation = "Reverse"
 )
+
+// IsCore reports whether the operation is required by every driver.
+func (operation Operation) IsCore() bool {
+	switch operation {
+	case
+		OperationInspect,
+		OperationEvaluate,
+		OperationRedeem:
+		return true
+
+	default:
+		return false
+	}
+}
 
 // OperationMode is an operation-specific supported mode.
 type OperationMode string
@@ -104,7 +117,7 @@ func validateOptionalOperation(operation Operation, index int) error {
 	if operation == "" {
 		return fmt.Errorf("benefit: operation at index %d is empty", index)
 	}
-	if isCoreOperation(operation) {
+	if operation.IsCore() {
 		return fmt.Errorf("benefit: core operation %q must not be declared", operation)
 	}
 	return nil
@@ -134,19 +147,6 @@ func (capability OperationCapability) SupportsMode(mode OperationMode) bool {
 	return containsOperationMode(capability.Modes, mode)
 }
 
-func isCoreOperation(operation Operation) bool {
-	switch operation {
-	case
-		OperationInspect,
-		OperationEvaluate,
-		OperationRedeem:
-		return true
-
-	default:
-		return false
-	}
-}
-
 // Get returns the capability declaration for an operation.
 func (capabilities OperationCapabilities) Get(operation Operation) (OperationCapability, bool) {
 	for _, capability := range capabilities {
@@ -161,15 +161,6 @@ func containsOperationMode(modes []OperationMode, target OperationMode) bool {
 	return slices.ContainsFunc(modes, func(m OperationMode) bool {
 		return m == target
 	})
-}
-
-func cloneOperationCapabilities(capabilities OperationCapabilities) OperationCapabilities {
-	cloned := make(OperationCapabilities, len(capabilities))
-	for i, capability := range capabilities {
-		cloned[i] = capability
-		cloned[i].Modes = append([]OperationMode(nil), capability.Modes...)
-	}
-	return cloned
 }
 
 // OperationDecisionStatus is the mutually exclusive result of evaluating an
@@ -259,112 +250,4 @@ func (d OperationDecision) Validate() error {
 		}
 	}
 	return nil
-}
-
-// EvaluateOperation checks a driver capability, applies matching
-// benefit-specific policies, and evaluates their availability constraints.
-// An empty mode evaluates the operation as a whole and does not match
-// mode-specific policies.
-func EvaluateOperation(
-	ctx context.Context,
-	registry *ConstraintRegistry,
-	capabilities OperationCapabilities,
-	policies OperationPolicies,
-	operation Operation,
-	mode OperationMode,
-	input EvaluationInput,
-) (OperationDecision, error) {
-	if isCoreOperation(operation) {
-		const msg = "benefit: core operation %q does not require capability evaluation"
-		return OperationDecision{}, fmt.Errorf(msg, operation)
-	}
-	if registry == nil {
-		return OperationDecision{}, errors.New("benefit: constraint registry is nil")
-	}
-	if err := capabilities.Validate(); err != nil {
-		return OperationDecision{}, err
-	}
-	if err := policies.Validate(); err != nil {
-		return OperationDecision{}, err
-	}
-	if err := validateOperationPoliciesAgainstCapabilities(capabilities, policies); err != nil {
-		return OperationDecision{}, err
-	}
-
-	capability, ok := capabilities.Get(operation)
-	if !ok {
-		return unsupportedOperationDecision(operation, mode, "operation is not supported"), nil
-	}
-	if mode != "" && !capability.SupportsMode(mode) {
-		return unsupportedOperationDecision(operation, mode, "operation mode is not supported"), nil
-	}
-
-	var constraints Constraints
-	for _, policy := range policies {
-		if !policyMatches(policy, operation, mode) {
-			continue
-		}
-		if policy.Disabled {
-			return unsupportedOperationDecision(operation, mode, "operation is disabled for this benefit"), nil
-		}
-		constraints = append(constraints, policy.Constraints...)
-	}
-
-	report := registry.EvaluateAll(ctx, input, constraints)
-	decision := OperationDecision{
-		Operation:   operation,
-		Mode:        mode,
-		Status:      OperationDecisionStatusEligible,
-		Constraints: report,
-	}
-	if !report.IsSatisfied() {
-		decision.Status = OperationDecisionStatusIneligible
-		decision.Reason = "operation constraints are unsatisfied"
-	}
-	return decision, nil
-}
-
-func validateOperationPoliciesAgainstCapabilities(
-	capabilities OperationCapabilities,
-	policies OperationPolicies,
-) error {
-	for _, policy := range policies {
-		capability, ok := capabilities.Get(policy.Operation)
-		if !ok {
-			const msg = "benefit: operation policy targets unsupported operation %q"
-			return fmt.Errorf(msg, policy.Operation)
-		}
-
-		for _, mode := range policy.MatchModes {
-			if !capability.SupportsMode(mode) {
-				const msg = "benefit: operation %q policy targets unsupported mode %q"
-				return fmt.Errorf(msg, policy.Operation, mode)
-			}
-		}
-	}
-	return nil
-}
-
-func policyMatches(policy OperationPolicy, operation Operation, mode OperationMode) bool {
-	if policy.Operation != operation {
-		return false
-	}
-	if len(policy.MatchModes) == 0 {
-		return true
-	}
-	return mode != "" && containsOperationMode(policy.MatchModes, mode)
-}
-
-func unsupportedOperationDecision(
-	operation Operation,
-	mode OperationMode,
-	reason string,
-) OperationDecision {
-	return OperationDecision{
-		Operation:   operation,
-		Mode:        mode,
-		Status:      OperationDecisionStatusUnsupported,
-		Diagnostic:  Diagnostic{Reason: reason},
-		Constraints: ConstraintReport{Status: ConstraintReportStatusUnevaluated},
-	}
 }

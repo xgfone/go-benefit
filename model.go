@@ -1,7 +1,5 @@
 package benefit
 
-import "time"
-
 // TypeDescriptor identifies a named type with optional display metadata.
 type TypeDescriptor struct {
 	Type string
@@ -66,20 +64,4 @@ type BenefitInfo struct {
 // provider ID, or another sensitive driver-specific identifier.
 type BenefitReference struct {
 	Value string `json:"-"`
-}
-
-// EvaluationInput contains in-process data used by constraint evaluators.
-// Evaluators must treat the input and all values reachable from it as immutable
-// and must not retain them after Evaluate returns.
-type EvaluationInput struct {
-	Benefit BenefitInfo
-	Input   DriverInput `json:"-"`
-	Now     time.Time   `json:",omitzero"`
-}
-
-func (in *EvaluationInput) evaluationTime() time.Time {
-	if !in.Now.IsZero() {
-		return in.Now
-	}
-	return time.Now()
 }

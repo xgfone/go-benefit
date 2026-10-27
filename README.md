@@ -15,9 +15,11 @@ benefits without imposing one transaction or product model on applications.
 Every driver implements the interface `Driver`; `Reverser` is an
 optional capability. No result-query operation is currently defined. Future
 result-query operations can be added as optional capabilities without expanding
-the core `Driver` interface. The package provides driver registration and
-binding, normalized results, constraints, money, and operation contracts; it
-does not provide persistence, transport DTOs, or multi-benefit orchestration.
+the core `Driver` interface. The core package defines normalized results,
+constraints, money, and operation contracts. Optional subpackages provide driver
+registration and binding, local constraint evaluation, and discount calculations.
+The module does not provide persistence, transport DTOs, or multi-benefit
+orchestration.
 
 See the runnable [end-to-end example](example_test.go) for a complete driver
 definition, configuration schema, validation and binding flow, custom operation
@@ -30,6 +32,24 @@ Install the package with:
 go get github.com/xgfone/go-benefit
 ```
 
+## Packages
+
+| Import path                               | Responsibility                                                                                                                               |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `github.com/xgfone/go-benefit`            | Core driver interfaces, configuration contracts, benefit models, requests, results, constraint definitions and reports, and model validation |
+| `github.com/xgfone/go-benefit/driver`     | Driver registration, descriptor snapshots, configuration validation, and binding                                                             |
+| `github.com/xgfone/go-benefit/constraint` | Constraint input, evaluator interfaces, registries, built-in rules, parameters, and extractors                                               |
+| `github.com/xgfone/go-benefit/evaluation` | Local eligibility, optional-operation availability, status resolution, and status-to-failure mapping                                         |
+| `github.com/xgfone/go-benefit/discount`   | Fixed-amount and percentage discount calculations                                                                                            |
+
+Drivers can implement the complete provider-facing contract by importing only
+`benefit`. The functional subpackages depend on the core; `evaluation` also
+depends on `constraint`. The core does not import any functional subpackage or
+initialize their default registries.
+
+Model methods such as `Validate`, `IsZero`, and `IsSatisfied`, along with
+`NewConstraint` and `Constraint.DecodeParams`, remain in `benefit`.
+
 ## Driver lifecycle
 
 A `DriverDefinition` describes one registrable driver type. Its `DriverType` is
@@ -39,29 +59,34 @@ two dot-separated segments; each segment uses lower-case letters, digits,
 underscores, or hyphens and must start with a letter or digit.
 
 `DriverDefinition.Descriptor()` returns complete driver type metadata, including
-`ConfigSchema` and optional operation capabilities. `DriverRegistry.Descriptors()`
+`ConfigSchema` and optional operation capabilities. `driver.Registry.Descriptors()`
 returns a consistent, independent snapshot of these descriptors sorted by type,
 so management applications can list drivers and their configuration forms in
 one query. For user-facing lists, convert each entry with
 `DriverDescriptor.Descriptor()` to obtain only `Type`, `Name`, and `Icon`.
-`DriverRegistry.ConfigSchema(type)` remains available for individual schema queries.
+`driver.Registry.ConfigSchema(type)` remains available for individual schema
+queries.
 
 Management applications use `DriverDescriptor.ConfigSchema` to render configuration
-forms and call `ValidateConfig` before encrypting and persisting operator input. A
-`DriverConfig` is either empty, when the schema permits it, or a UTF-8 JSON
+forms and call `ValidateConfig` before encrypting and persisting operator input.
+A `DriverConfig` is either empty, when the schema permits it, or a UTF-8 JSON
 object. Schemas use JSON Schema Draft 2020-12 and may include UI extensions such
 as `x-secret`. `DriverDefinition.ValidateConfig` is authoritative and must agree
 with `CompileConfig`; it is side-effect free and does not populate compilation
 caches. Runtime binding does not call management validation again, so
 `CompileConfig` independently validates and parses persisted configuration.
 
-At runtime, `DriverRegistry.Bind` calls deterministic, local `CompileConfig`
+At runtime, `driver.Registry.Bind` calls deterministic, local `CompileConfig`
 and obtains a driver from the resulting `DriverFactory`. Definitions and proxies
 may cache factories for equal configurations, and a factory may return the same
 driver or different lightweight drivers across calls. The resulting driver has
 provider credentials and fixed matching rules already bound, so operation calls
 do not repeatedly receive sensitive configuration. Compiled factories and bound
 drivers must be safe for concurrent use.
+
+`driver.NewRegistry` creates an independent, empty registry. Package helpers
+`driver.Register`, `driver.ValidateConfig`, and `driver.Bind` use the shared
+registry returned by `driver.DefaultRegistry()`.
 
 ## Operation inputs and behavior
 
@@ -87,12 +112,12 @@ driver; provider and kind metadata come from its `DriverDescriptor`.
 `ProviderBenefitId` is optional and must not contain a bearer secret. Drivers map
 raw provider states to normalized `Status` values and may retain non-standard
 diagnostics in opaque `ProviderData`. When a reference does not resolve to a
-benefit, `Inspect` returns `ErrBenefitNotFound` and no `BenefitInfo`. This lookup
-outcome is not a benefit lifecycle status.
+benefit, `Inspect` returns `ErrBenefitNotFound` and no `BenefitInfo`. This
+lookup outcome is not a benefit lifecycle status.
 
-`Evaluate` is a non-consuming quote or preflight. It is useful for displaying a
-projected outcome and for preparing a multi-benefit plan, but callers never have
-to call it before `Redeem`. `Redeem` is authoritative, accepts an empty
+`Evaluate` is a non-consuming quote or preflight. It is useful for displaying
+a projected outcome and for preparing a multi-benefit plan, but callers never
+have to call it before `Redeem`. `Redeem` is authoritative, accepts an empty
 `EvaluationToken`, and must recheck current status, provider matching, and all
 constraints even when an earlier evaluation was eligible. A confirmed missing
 benefit is represented by `EvaluationFailureBenefitNotFound` from `Evaluate`
@@ -109,22 +134,26 @@ those driver capabilities. With no policies, the benefit inherits the complete
 driver capability set. A policy with `Disabled` permanently disables its matched
 operation or modes. A conditional policy instead supplies positive availability
 constraints: all constraints from all matching policies must be satisfied.
-`MatchModes` is a selector; an empty list matches the whole operation, while a
-non-empty list matches only the listed modes. Policies cannot introduce an
+`MatchModes` is a selector; an empty list matches the whole operation, while
+a non-empty list matches only the listed modes. Policies cannot introduce an
 operation or mode outside the driver's capabilities.
 
-`EvaluateOperation` combines capabilities and policies for one operation and
-optional mode. A missing capability or matching permanent disablement produces
+`evaluation.EvaluateOperation` combines capabilities and policies for one operation
+and optional mode. A missing capability or matching permanent disablement produces
 `unsupported`; an unsatisfied conditional policy produces `ineligible`; and
 satisfied constraints produce `eligible`. Raw policy constraints and operator
 remarks are not part of the returned `OperationDecision`.
 
+`evaluation.ResolveStatus` derives a normalized status from `evaluation.StatusFacts`
+using provider-terminal, exhaustion, and validity-window precedence.
+`evaluation.RedeemFailureCodeForStatus` maps inactive statuses to core failure codes.
+
 ## Constraints
 
 Constraints and operation capabilities are ordered lists. A concurrency-safe
-`ConstraintRegistry` maps each namespaced `ConstraintType` to its evaluator.
-Registration validates the type name; evaluation does not reject malformed
-input names separately because any unregistered type is already
+`constraint.Registry` maps each namespaced `benefit.ConstraintType` to its
+evaluator. Registration validates the type name; evaluation does not reject
+malformed input names separately because any unregistered type is already
 `unrecognized`.
 
 All constraints are evaluated so callers receive every violation. An unknown,
@@ -134,31 +163,40 @@ and `unsatisfied`; an evaluated empty list is satisfied. A satisfied report has
 no decisions, while an unsatisfied report contains only its `Violations`.
 
 Constraint definitions contain evaluator parameters and an optional operator
-remark. They are available in-process and to explicit management mappings, but
-are excluded from `BenefitInfo` JSON. A `ConstraintDecision` contains only the
-constraint type, its decision code, and optional safe diagnostic information;
-it never embeds the original definition. Human-facing constraint information
-belongs in `Notice` instead.
+remark. Definitions, parameters, and remarks are included in `BenefitInfo` JSON;
+applications should map them explicitly when exposing management or user-facing
+data. A `ConstraintDecision` contains only the constraint type, its decision
+code, and optional safe diagnostic information; it never embeds the original
+definition. Human-facing constraint information belongs in `Notice` instead.
 
 Drivers should model fixed filters compiled from `DriverConfig` and per-call
-facts extracted from `DriverInput` with the same constraint mechanism. A
-driver should return a merchant, store, or product mismatch as a
+facts extracted from `DriverInput` with the same constraint mechanism.
+A driver should return a merchant, store, or product mismatch as a
 `constraint.unsatisfied` business result, not as an unsupported operation.
 
-The default registry includes context-independent time-range, weekday, and
-redemption-limit evaluators. Amount and scope evaluators require
+`constraint.NewRegistry` creates an empty registry. `constraint.NewDefaultRegistry`
+and the shared `constraint.DefaultRegistry` include context-independent time-range,
+weekday, and redemption-limit evaluators. Amount and scope evaluators require
 application-defined extractors so the package does not need a universal
 transaction structure. A currency-wildcard amount constraint applies the same
 integer threshold in the actual currency's minor-unit convention; it does not
 perform precision or exchange-rate conversion.
 
+Evaluators implement `constraint.Evaluator` and receive a `constraint.Input`
+containing the benefit snapshot, application input, and optional evaluation time.
+`constraint.Register` and `constraint.Evaluate` use the shared default registry.
+`evaluation.EvaluateLocalEligibility` checks lifecycle status before evaluating
+constraints and uses that same default registry when passed a nil registry.
+Inactive benefits return an unevaluated constraint report.
+`evaluation.EvaluateOperation` requires an explicit non-nil registry.
+
 ## Outcomes and mutation results
 
-`BenefitOutcome` describes the value projected by Evaluate or confirmed by
-Redeem. Its current normalized component is an optional monetary `Discount`.
-Non-monetary outcome models are intentionally deferred. Future outcome categories
-can be added as optional fields and new types without changing the existing
-driver operation signatures or the meaning of `Discount`.
+`BenefitOutcome` describes the value projected by Evaluate or confirmed by Redeem.
+Its current normalized component is an optional monetary `Discount`. Non-monetary
+outcome models are intentionally deferred. Future outcome categories can be added
+as optional fields and new types without changing the existing driver operation
+signatures or the meaning of `Discount`.
 
 Use keyed struct literals for public models and tolerate unknown optional JSON
 fields when integrating the protocol. A missing `Discount` means no monetary
@@ -186,10 +224,10 @@ currency registry. A non-empty `Currency` must have the three-ASCII-letter ISO
 4217 form. Input and comparison are case-insensitive, while applications and
 drivers should emit the canonical upper-case form.
 
-`CalculateAmountDiscount` checks a fixed amount and its currency against the
+`discount.CalculateAmount` checks a fixed amount and its currency against the
 transaction before consumption. It rejects face values greater than the original
 amount; a driver that caps face value must do so explicitly. The original amount
-must be supplied even when it is zero. `CalculatePercentageDiscount` accepts
+must be supplied even when it is zero. `discount.CalculatePercentage` accepts
 integer basis points of the amount saved (1000 saves 10%, 10000 is free), rounds
 down to minor units, and avoids floating-point arithmetic and integer overflow.
 
@@ -199,8 +237,8 @@ when possible so the records remain self-contained. A `free` discount means the
 payable amount is zero and the discount equals the original amount.
 
 State-changing results distinguish confirmed success, confirmed failure,
-accepted but pending work, and an unknown outcome. Provider timeouts must not be
-reported as confirmed failures when the remote operation may have completed.
+accepted but pending work, and an unknown outcome. Provider timeouts must not
+be reported as confirmed failures when the remote operation may have completed.
 Go errors are reserved for local invocation or integration failures that do not
 express a confirmed provider business result.
 
@@ -215,11 +253,11 @@ operator-facing information and carries its BCP 47 language tag in `Lang`.
 `RedemptionId` and `ReversalId` are optional caller-assigned correlation and
 idempotency IDs. When supplied, callers reuse the same ID when retrying an
 uncertain operation. Drivers pass it to providers as an idempotency key when
-possible, while hosts may persist or deduplicate operations when a provider has
-no idempotency facility. Without an operation ID, the caller and driver can
-only rely on provider-side idempotency. In an idempotent implementation, a
-same-ID retry returns the original result rather than `benefit.redeemed`; the
-core package does not store operation results.
+possible, while hosts may persist or deduplicate operations when a provider
+has no idempotency facility. Without an operation ID, the caller and driver
+can only rely on provider-side idempotency. In an idempotent implementation,
+a same-ID retry returns the original result rather than `benefit.redeemed`;
+the core package does not store operation results.
 
 Provider-assigned IDs are separate from caller-assigned operation IDs. Redeem
 returns a `ProviderRedemptionId` when the provider supplies one. Reverse accepts
@@ -235,12 +273,12 @@ may ignore all redemption IDs and use only `BenefitReference`.
 
 ## Composition and security
 
-The package processes exactly one benefit per driver call. A future
-orchestration layer can select automatic and explicit benefits, plan their
-order, optionally assign one operation ID per atomic redemption, and compensate
-completed steps with Reverse. A fixed exchange that one provider performs
-atomically may be modeled as Redeem; an exchange spanning independent drivers
-belongs in the orchestration layer.
+The package processes exactly one benefit per driver call. A future orchestration
+layer can select automatic and explicit benefits, plan their order, optionally
+assign one operation ID per atomic redemption, and compensate completed steps
+with Reverse. A fixed exchange that one provider performs atomically may be
+modeled as Redeem; an exchange spanning independent drivers belongs in the
+orchestration layer.
 
 Applications must encrypt stored driver configurations, mask secrets in
 management APIs, and protect bearer references with an appropriate lookup and

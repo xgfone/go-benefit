@@ -1,48 +1,51 @@
-package benefit
+package constraint
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/xgfone/go-benefit"
 )
 
-// AmountConstraintParams configures a minimum or maximum operation amount.
+// AmountParams configures a minimum or maximum operation amount.
 // An empty Currency makes the constraint apply to every transaction currency.
-type AmountConstraintParams struct {
+type AmountParams struct {
 	Amount   int64
 	Currency string
 }
 
 // AmountExtractor extracts an operation amount from application-defined input.
-type AmountExtractor func(EvaluationInput) (Money, bool, error)
+type AmountExtractor func(Input) (benefit.Money, bool, error)
 
 type amountConstraintEvaluator struct {
 	extract AmountExtractor
 	minimum bool
 }
 
-// NewMinimumAmountConstraintEvaluator returns an evaluator that uses extract
+// NewMinimumAmountEvaluator returns an evaluator that uses extract
 // to obtain the application-defined operation amount.
-func NewMinimumAmountConstraintEvaluator(extract AmountExtractor) ConstraintEvaluator {
+func NewMinimumAmountEvaluator(extract AmountExtractor) Evaluator {
 	return amountConstraintEvaluator{extract: extract, minimum: true}
 }
 
-// NewMaximumAmountConstraintEvaluator returns an evaluator that uses extract
+// NewMaximumAmountEvaluator returns an evaluator that uses extract
 // to obtain the application-defined operation amount.
-func NewMaximumAmountConstraintEvaluator(extract AmountExtractor) ConstraintEvaluator {
+func NewMaximumAmountEvaluator(extract AmountExtractor) Evaluator {
 	return amountConstraintEvaluator{extract: extract}
 }
 
 func (e amountConstraintEvaluator) Evaluate(
 	ctx context.Context,
-	constraint Constraint,
-	input EvaluationInput,
-) (ConstraintDecision, error) {
+	constraint benefit.Constraint,
+	input Input,
+) (benefit.ConstraintDecision, error) {
 	if err := ctx.Err(); err != nil {
-		return ConstraintDecision{}, err
+		return benefit.ConstraintDecision{}, err
 	}
 	if e.extract == nil {
-		return ConstraintDecision{}, errors.New("benefit: amount extractor is nil")
+		return benefit.ConstraintDecision{}, errors.New("benefit: amount extractor is nil")
 	}
 
 	params, invalid := decodeAmountConstraint(constraint)
@@ -52,18 +55,18 @@ func (e amountConstraintEvaluator) Evaluate(
 
 	actual, found, err := e.extract(input)
 	if err != nil {
-		return ConstraintDecision{}, err
+		return benefit.ConstraintDecision{}, err
 	}
 
 	if !found {
-		return ConstraintDecisionUnsatisfied.Decision("operation amount is unavailable", nil), nil
+		return benefit.ConstraintDecisionUnsatisfied.Decision("operation amount is unavailable", nil), nil
 	}
 
 	if err := actual.Validate(); err != nil {
-		return ConstraintDecision{}, fmt.Errorf("benefit: invalid operation amount: %w", err)
+		return benefit.ConstraintDecision{}, fmt.Errorf("benefit: invalid operation amount: %w", err)
 	}
 	if actual.Amount < 0 {
-		return ConstraintDecision{}, errors.New("benefit: operation amount must not be negative")
+		return benefit.ConstraintDecision{}, errors.New("benefit: operation amount must not be negative")
 	}
 	if decision := compareCurrency(actual.Currency, params.Currency); decision != nil {
 		return *decision, nil
@@ -88,8 +91,8 @@ func (e amountConstraintEvaluator) Evaluate(
 	return constraintDecision(satisfied, reason, details), nil
 }
 
-func decodeAmountConstraint(constraint Constraint) (AmountConstraintParams, *ConstraintDecision) {
-	var params AmountConstraintParams
+func decodeAmountConstraint(constraint benefit.Constraint) (AmountParams, *benefit.ConstraintDecision) {
+	var params AmountParams
 	if err := constraint.DecodeParams(&params); err != nil {
 		decision := invalidConstraint(err.Error())
 		return params, &decision
@@ -100,18 +103,18 @@ func decodeAmountConstraint(constraint Constraint) (AmountConstraintParams, *Con
 		return params, &decision
 	}
 
-	if err := validateCurrencyCode(params.Currency); err != nil {
+	if err := (benefit.Money{Currency: params.Currency}).Validate(); err != nil {
 		decision := invalidConstraint(err.Error())
 		return params, &decision
 	}
 
-	params.Currency = canonicalCurrencyCode(params.Currency)
+	params.Currency = strings.ToUpper(params.Currency)
 	return params, nil
 }
 
-func compareCurrency(actual, required string) *ConstraintDecision {
-	if required != "" && !equalCurrencyCode(actual, required) {
-		decision := ConstraintDecisionUnsatisfied.Decision(
+func compareCurrency(actual, required string) *benefit.ConstraintDecision {
+	if required != "" && !strings.EqualFold(actual, required) {
+		decision := benefit.ConstraintDecisionUnsatisfied.Decision(
 			"operation currency does not match the constraint currency",
 			map[string]any{
 				"actual_currency":   actual,

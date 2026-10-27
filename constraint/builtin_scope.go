@@ -1,10 +1,12 @@
-package benefit
+package constraint
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/xgfone/go-benefit"
 )
 
 // ScopeMatch controls how extracted values are matched against an allow list.
@@ -15,11 +17,11 @@ const (
 	ScopeMatchAll ScopeMatch = "all"
 )
 
-// ScopeConstraintParams configures an allow-list scope constraint.
+// ScopeParams configures an allow-list scope constraint.
 //
 // Values must be non-sensitive because failed decisions may expose scope values
 // in Diagnostic.Details for troubleshooting.
-type ScopeConstraintParams struct {
+type ScopeParams struct {
 	Values []string
 	Match  ScopeMatch `json:",omitempty"`
 }
@@ -27,31 +29,31 @@ type ScopeConstraintParams struct {
 // ScopeValuesExtractor extracts application-defined values for scope matching.
 // Returned values must be non-sensitive because failed decisions include them
 // in Diagnostic.Details for troubleshooting.
-type ScopeValuesExtractor func(EvaluationInput) ([]string, error)
+type ScopeValuesExtractor func(Input) ([]string, error)
 
 type scopeConstraintEvaluator struct {
 	extract ScopeValuesExtractor
 }
 
-// NewScopeConstraintEvaluator returns an evaluator that matches values from
-// extract against the allow list stored in ScopeConstraintParams.
-func NewScopeConstraintEvaluator(extract ScopeValuesExtractor) ConstraintEvaluator {
+// NewScopeEvaluator returns an evaluator that matches values from
+// extract against the allow list stored in ScopeParams.
+func NewScopeEvaluator(extract ScopeValuesExtractor) Evaluator {
 	return scopeConstraintEvaluator{extract: extract}
 }
 
 func (e scopeConstraintEvaluator) Evaluate(
 	ctx context.Context,
-	constraint Constraint,
-	input EvaluationInput,
-) (ConstraintDecision, error) {
+	constraint benefit.Constraint,
+	input Input,
+) (benefit.ConstraintDecision, error) {
 	if err := ctx.Err(); err != nil {
-		return ConstraintDecision{}, err
+		return benefit.ConstraintDecision{}, err
 	}
 	if e.extract == nil {
-		return ConstraintDecision{}, errors.New("benefit: scope values extractor is nil")
+		return benefit.ConstraintDecision{}, errors.New("benefit: scope values extractor is nil")
 	}
 
-	var params ScopeConstraintParams
+	var params ScopeParams
 	if err := constraint.DecodeParams(&params); err != nil {
 		return invalidConstraint(err.Error()), nil
 	}
@@ -77,7 +79,7 @@ func (e scopeConstraintEvaluator) Evaluate(
 
 	values, err := e.extract(input)
 	if err != nil {
-		return ConstraintDecision{}, err
+		return benefit.ConstraintDecision{}, err
 	}
 
 	satisfied := matchScope(values, allowed, params.Match)

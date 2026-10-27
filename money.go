@@ -3,7 +3,6 @@ package benefit
 import (
 	"errors"
 	"fmt"
-	"strings"
 )
 
 // Money stores an integer amount and its optional ISO 4217 currency code.
@@ -89,12 +88,4 @@ func validateCurrencyCode(code string) error {
 		}
 	}
 	return nil
-}
-
-func canonicalCurrencyCode(code string) string {
-	return strings.ToUpper(code)
-}
-
-func equalCurrencyCode(left, right string) bool {
-	return strings.EqualFold(left, right)
 }

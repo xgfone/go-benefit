@@ -1,33 +1,35 @@
-package benefit
+package constraint
 
 import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/xgfone/go-benefit"
 )
 
-// TimeRangeConstraintParams configures an inclusive-start, exclusive-end range.
-type TimeRangeConstraintParams struct {
+// TimeRangeParams configures an inclusive-start, exclusive-end range.
+type TimeRangeParams struct {
 	StartsAt  time.Time `json:",omitzero"`
 	ExpiresAt time.Time `json:",omitzero"`
 }
 
-// WeekdayConstraintParams configures allowed weekdays and an optional timezone.
-type WeekdayConstraintParams struct {
+// WeekdayParams configures allowed weekdays and an optional timezone.
+type WeekdayParams struct {
 	Weekdays []time.Weekday
 	Timezone string `json:",omitempty"`
 }
 
 func evaluateTimeRange(
 	ctx context.Context,
-	constraint Constraint,
-	input EvaluationInput,
-) (ConstraintDecision, error) {
+	constraint benefit.Constraint,
+	input Input,
+) (benefit.ConstraintDecision, error) {
 	if err := ctx.Err(); err != nil {
-		return ConstraintDecision{}, err
+		return benefit.ConstraintDecision{}, err
 	}
 
-	var params TimeRangeConstraintParams
+	var params TimeRangeParams
 	if err := constraint.DecodeParams(&params); err != nil {
 		return invalidConstraint(err.Error()), nil
 	}
@@ -46,12 +48,12 @@ func evaluateTimeRange(
 	return constraintDecision(satisfied, msg, map[string]any{"evaluated_at": now}), nil
 }
 
-func evaluateWeekday(ctx context.Context, constraint Constraint, input EvaluationInput) (ConstraintDecision, error) {
+func evaluateWeekday(ctx context.Context, constraint benefit.Constraint, input Input) (benefit.ConstraintDecision, error) {
 	if err := ctx.Err(); err != nil {
-		return ConstraintDecision{}, err
+		return benefit.ConstraintDecision{}, err
 	}
 
-	var params WeekdayConstraintParams
+	var params WeekdayParams
 	if err := constraint.DecodeParams(&params); err != nil {
 		return invalidConstraint(err.Error()), nil
 	}

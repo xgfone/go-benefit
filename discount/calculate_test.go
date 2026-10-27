@@ -1,15 +1,18 @@
-package benefit
+package discount_test
 
 import (
 	"math"
 	"math/big"
 	"testing"
+
+	"github.com/xgfone/go-benefit"
+	"github.com/xgfone/go-benefit/discount"
 )
 
 func TestCalculatePercentageDiscount(t *testing.T) {
 	for _, amount := range []int64{0, 1, 99, 101, 99999999, math.MaxInt64} {
 		for _, rate := range []int64{0, 1, 3333, 9999, 10000} {
-			effect, err := CalculatePercentageDiscount(Money{
+			effect, err := discount.CalculatePercentage(benefit.Money{
 				Amount:   amount,
 				Currency: "cny",
 			}, rate)
@@ -29,7 +32,7 @@ func TestCalculatePercentageDiscount(t *testing.T) {
 	}
 
 	for _, rate := range []int64{-1, 10001, math.MaxInt64} {
-		if _, err := CalculatePercentageDiscount(Money{Amount: 100}, rate); err == nil {
+		if _, err := discount.CalculatePercentage(benefit.Money{Amount: 100}, rate); err == nil {
 			t.Fatalf("accepted rate %d", rate)
 		}
 	}
@@ -37,19 +40,19 @@ func TestCalculatePercentageDiscount(t *testing.T) {
 
 func TestCalculateAmountDiscount(t *testing.T) {
 	for _, tc := range []struct {
-		original, discount Money
+		original, discount benefit.Money
 		valid              bool
 	}{
-		{Money{100, "CNY"}, Money{25, "cny"}, true},
-		{Money{100, "CNY"}, Money{25, ""}, true},
-		{Money{0, "CNY"}, Money{0, "CNY"}, true},
-		{Money{100, "CNY"}, Money{25, "USD"}, false},
-		{Money{100, ""}, Money{25, "CNY"}, false},
-		{Money{0, "CNY"}, Money{1, ""}, false},
-		{Money{100, "CNY"}, Money{-1, ""}, false},
-		{Money{math.MinInt64, ""}, Money{math.MaxInt64, ""}, false},
+		{benefit.Money{Amount: 100, Currency: "CNY"}, benefit.Money{Amount: 25, Currency: "cny"}, true},
+		{benefit.Money{Amount: 100, Currency: "CNY"}, benefit.Money{Amount: 25}, true},
+		{benefit.Money{Currency: "CNY"}, benefit.Money{Currency: "CNY"}, true},
+		{benefit.Money{Amount: 100, Currency: "CNY"}, benefit.Money{Amount: 25, Currency: "USD"}, false},
+		{benefit.Money{Amount: 100}, benefit.Money{Amount: 25, Currency: "CNY"}, false},
+		{benefit.Money{Currency: "CNY"}, benefit.Money{Amount: 1}, false},
+		{benefit.Money{Amount: 100, Currency: "CNY"}, benefit.Money{Amount: -1}, false},
+		{benefit.Money{Amount: math.MinInt64}, benefit.Money{Amount: math.MaxInt64}, false},
 	} {
-		effect, err := CalculateAmountDiscount(tc.original, tc.discount)
+		effect, err := discount.CalculateAmount(tc.original, tc.discount)
 		if (err == nil) != tc.valid {
 			t.Fatalf("%+v: effect=%+v err=%v", tc, effect, err)
 		}

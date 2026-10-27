@@ -1,32 +1,34 @@
-package benefit
+package driver
 
 import (
 	"errors"
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/xgfone/go-benefit"
 )
 
-// DriverRegistry is a concurrency-safe registry of driver definitions.
-type DriverRegistry struct {
+// Registry is a concurrency-safe registry of driver definitions.
+type Registry struct {
 	mu          sync.RWMutex
-	definitions map[DriverType]registeredDriverDefinition
+	definitions map[benefit.DriverType]registeredDriverDefinition
 }
 
 type registeredDriverDefinition struct {
-	definition DriverDefinition
-	descriptor DriverDescriptor
+	definition benefit.DriverDefinition
+	descriptor benefit.DriverDescriptor
 }
 
-// NewDriverRegistry returns an empty driver registry.
-func NewDriverRegistry() *DriverRegistry {
-	return &DriverRegistry{
-		definitions: make(map[DriverType]registeredDriverDefinition, 8),
+// NewRegistry returns an empty driver registry.
+func NewRegistry() *Registry {
+	return &Registry{
+		definitions: make(map[benefit.DriverType]registeredDriverDefinition, 8),
 	}
 }
 
 // Register adds a driver definition and rejects duplicate driver types.
-func (r *DriverRegistry) Register(definition DriverDefinition) error {
+func (r *Registry) Register(definition benefit.DriverDefinition) error {
 	if r == nil {
 		return errors.New("benefit: driver registry is nil")
 	}
@@ -53,7 +55,7 @@ func (r *DriverRegistry) Register(definition DriverDefinition) error {
 }
 
 // Unregister removes a definition and reports whether it existed.
-func (r *DriverRegistry) Unregister(driverType DriverType) bool {
+func (r *Registry) Unregister(driverType benefit.DriverType) bool {
 	if r == nil {
 		return false
 	}
@@ -67,20 +69,20 @@ func (r *DriverRegistry) Unregister(driverType DriverType) bool {
 }
 
 // Get returns a registered definition.
-func (r *DriverRegistry) Get(driverType DriverType) (DriverDefinition, bool) {
+func (r *Registry) Get(driverType benefit.DriverType) (benefit.DriverDefinition, bool) {
 	registered, ok := r.get(driverType)
 	return registered.definition, ok
 }
 
 // ConfigSchema returns the registered configuration schema snapshot.
-func (r *DriverRegistry) ConfigSchema(driverType DriverType) (ConfigSchema, bool) {
+func (r *Registry) ConfigSchema(driverType benefit.DriverType) (benefit.ConfigSchema, bool) {
 	if registered, ok := r.get(driverType); ok {
 		return registered.descriptor.ConfigSchema.Clone(), true
 	}
-	return ConfigSchema{}, false
+	return benefit.ConfigSchema{}, false
 }
 
-func (r *DriverRegistry) get(driverType DriverType) (registeredDriverDefinition, bool) {
+func (r *Registry) get(driverType benefit.DriverType) (registeredDriverDefinition, bool) {
 	if r == nil {
 		return registeredDriverDefinition{}, false
 	}
@@ -95,7 +97,7 @@ func (r *DriverRegistry) get(driverType DriverType) (registeredDriverDefinition,
 // Descriptors returns a consistent snapshot of all complete descriptors,
 // sorted by driver type. Returned descriptors do not share mutable data
 // with the registry.
-func (r *DriverRegistry) Descriptors() []DriverDescriptor {
+func (r *Registry) Descriptors() []benefit.DriverDescriptor {
 	if r == nil {
 		return nil
 	}
@@ -108,11 +110,11 @@ func (r *DriverRegistry) Descriptors() []DriverDescriptor {
 	return descriptors
 }
 
-func (r *DriverRegistry) getDescriptors() []DriverDescriptor {
+func (r *Registry) getDescriptors() []benefit.DriverDescriptor {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	descriptors := make([]DriverDescriptor, 0, len(r.definitions))
+	descriptors := make([]benefit.DriverDescriptor, 0, len(r.definitions))
 	for _, definition := range r.definitions {
 		descriptors = append(descriptors, cloneDriverDescriptor(definition.descriptor))
 	}
@@ -121,7 +123,7 @@ func (r *DriverRegistry) getDescriptors() []DriverDescriptor {
 }
 
 // ValidateConfig validates configuration before a driver instance is persisted.
-func (r *DriverRegistry) ValidateConfig(driverType DriverType, config DriverConfig) error {
+func (r *Registry) ValidateConfig(driverType benefit.DriverType, config benefit.DriverConfig) error {
 	registered, ok := r.get(driverType)
 	if !ok {
 		return fmt.Errorf("benefit: driver type %q is not registered", driverType)
@@ -138,7 +140,7 @@ func (r *DriverRegistry) ValidateConfig(driverType DriverType, config DriverConf
 }
 
 // Bind compiles configuration and constructs a lightweight provider-bound driver.
-func (r *DriverRegistry) Bind(driverType DriverType, config DriverConfig) (Driver, error) {
+func (r *Registry) Bind(driverType benefit.DriverType, config benefit.DriverConfig) (benefit.Driver, error) {
 	registered, ok := r.get(driverType)
 	if !ok {
 		return nil, fmt.Errorf("benefit: driver type %q is not registered", driverType)
@@ -167,14 +169,14 @@ func (r *DriverRegistry) Bind(driverType DriverType, config DriverConfig) (Drive
 		return nil, fmt.Errorf(msg, driverType, descriptor.Type)
 	}
 
-	if err := validateDriverOperation[Reverser](driver, OperationReverse); err != nil {
+	if err := validateDriverOperation[benefit.Reverser](driver, benefit.OperationReverse); err != nil {
 		return nil, err
 	}
 
 	return driver, nil
 }
 
-func validateDriverOperation[T any](driver Driver, op Operation) error {
+func validateDriverOperation[T any](driver benefit.Driver, op benefit.Operation) error {
 	_, ok := driver.Descriptor().Operations.Get(op)
 	if !ok {
 		return nil
@@ -185,33 +187,50 @@ func validateDriverOperation[T any](driver Driver, op Operation) error {
 	}
 
 	const msg = "benefit: driver %q declares %q but does not implement Reverser"
-	return fmt.Errorf(msg, driver.Descriptor().Type, OperationReverse)
+	return fmt.Errorf(msg, driver.Descriptor().Type, benefit.OperationReverse)
 }
 
-func cloneDriverDescriptor(descriptor DriverDescriptor) DriverDescriptor {
+func cloneDriverDescriptor(descriptor benefit.DriverDescriptor) benefit.DriverDescriptor {
 	descriptor.Operations = cloneOperationCapabilities(descriptor.Operations)
 	descriptor.ConfigSchema = descriptor.ConfigSchema.Clone()
 	return descriptor
 }
 
-var defaultDriverRegistry = NewDriverRegistry()
+var defaultDriverRegistry = NewRegistry()
 
-// DefaultDriverRegistry is the package-level default driver registry.
-func DefaultDriverRegistry() *DriverRegistry {
+// DefaultRegistry returns the package-level default driver registry.
+func DefaultRegistry() *Registry {
 	return defaultDriverRegistry
 }
 
-// RegisterDriver registers a definition in the package-level registry.
-func RegisterDriver(definition DriverDefinition) error {
+// Register registers a definition in the package-level registry.
+func Register(definition benefit.DriverDefinition) error {
 	return defaultDriverRegistry.Register(definition)
 }
 
-// ValidateDriverConfig validates configuration with the package-level registry.
-func ValidateDriverConfig(driverType DriverType, config DriverConfig) error {
+// MustRegister registers a definition in the package-level registry
+// and panics if registration fails.
+func MustRegister(definition benefit.DriverDefinition) {
+	if err := Register(definition); err != nil {
+		panic(err)
+	}
+}
+
+// ValidateConfig validates configuration with the package-level registry.
+func ValidateConfig(driverType benefit.DriverType, config benefit.DriverConfig) error {
 	return defaultDriverRegistry.ValidateConfig(driverType, config)
 }
 
-// BindDriver constructs a driver from the package-level registry.
-func BindDriver(driverType DriverType, config DriverConfig) (Driver, error) {
+// Bind constructs a driver from the package-level registry.
+func Bind(driverType benefit.DriverType, config benefit.DriverConfig) (benefit.Driver, error) {
 	return defaultDriverRegistry.Bind(driverType, config)
+}
+
+func cloneOperationCapabilities(capabilities benefit.OperationCapabilities) benefit.OperationCapabilities {
+	cloned := make(benefit.OperationCapabilities, len(capabilities))
+	for i, capability := range capabilities {
+		cloned[i] = capability
+		cloned[i].Modes = append([]benefit.OperationMode(nil), capability.Modes...)
+	}
+	return cloned
 }

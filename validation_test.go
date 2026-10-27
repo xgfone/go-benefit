@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	benefit "github.com/xgfone/go-benefit"
+	"github.com/xgfone/go-benefit"
+	"github.com/xgfone/go-benefit/constraint"
 )
 
 func TestValidityOmitsZeroTimes(t *testing.T) {
@@ -70,7 +71,7 @@ func TestModelsOmitZeroValues(t *testing.T) {
 		value  any
 		fields []string
 	}{
-		{"evaluation input", benefit.EvaluationInput{}, []string{"Now"}},
+		{"evaluation input", constraint.Input{}, []string{"Now"}},
 		{"evaluation result", benefit.EvaluationResult{}, []string{"ExpiresAt", "Outcome"}},
 		{"redemption", benefit.Redemption{}, []string{"RedemptionId", "ProviderRedemptionId", "Outcome", "ProviderData"}},
 		{"reversal", reversal, []string{"Outcome", "ProviderData"}},
@@ -376,18 +377,6 @@ func TestBenefitInfoRequiresDriverType(t *testing.T) {
 	if !strings.Contains(encoded, `"ProviderBenefitId":"P1"`) ||
 		!strings.Contains(encoded, `"DriverType":"test.coupon"`) {
 		t.Fatalf("unexpected benefit info JSON: %s", encoded)
-	}
-}
-
-func TestDefaultConstraintRegistryContents(t *testing.T) {
-	types := benefit.DefaultConstraintRegistry.Types()
-	if len(types) != 3 {
-		t.Fatalf("got %d built-in constraint types, want 3: %#v", len(types), types)
-	}
-	for _, typ := range types {
-		if !strings.HasPrefix(string(typ), "benefit.") {
-			t.Fatalf("built-in constraint type is not namespaced: %q", typ)
-		}
 	}
 }
 

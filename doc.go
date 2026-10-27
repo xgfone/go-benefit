@@ -6,4 +6,8 @@
 // one benefit.
 //
 // Drivers adapt provider-specific APIs to the common model exposed here.
+// The core package contains driver contracts, normalized data, and model
+// validation. Optional subpackages provide driver registration and binding
+// (driver), constraint execution (constraint), local evaluation policies
+// (evaluation), and monetary calculations (discount).
 package benefit

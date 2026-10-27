@@ -1,22 +1,26 @@
-package benefit
+package constraint
 
-import "context"
+import (
+	"context"
 
-// RedemptionLimitConstraintParams sets the maximum cumulative redemption count.
-type RedemptionLimitConstraintParams struct {
+	"github.com/xgfone/go-benefit"
+)
+
+// RedemptionLimitParams sets the maximum cumulative redemption count.
+type RedemptionLimitParams struct {
 	MaxCount int64
 }
 
 func evaluateRedemptionLimit(
 	ctx context.Context,
-	constraint Constraint,
-	input EvaluationInput,
-) (ConstraintDecision, error) {
+	constraint benefit.Constraint,
+	input Input,
+) (benefit.ConstraintDecision, error) {
 	if err := ctx.Err(); err != nil {
-		return ConstraintDecision{}, err
+		return benefit.ConstraintDecision{}, err
 	}
 
-	var params RedemptionLimitConstraintParams
+	var params RedemptionLimitParams
 	if err := constraint.DecodeParams(&params); err != nil {
 		return invalidConstraint(err.Error()), nil
 	}

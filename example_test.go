@@ -8,7 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	benefit "github.com/xgfone/go-benefit"
+	"github.com/xgfone/go-benefit"
+	"github.com/xgfone/go-benefit/constraint"
+	"github.com/xgfone/go-benefit/discount"
+	"github.com/xgfone/go-benefit/driver"
+	"github.com/xgfone/go-benefit/evaluation"
 )
 
 const (
@@ -75,9 +79,9 @@ func (exampleDriverDefinition) CompileConfig(raw benefit.DriverConfig) (benefit.
 	}
 
 	minimum, err := benefit.NewConstraint(
-		benefit.ConstraintMinimumAmount,
+		constraint.MinimumAmount,
 		"A minimum purchase amount is required.",
-		benefit.AmountConstraintParams{
+		constraint.AmountParams{
 			Amount:   config.MinimumAmount,
 			Currency: "CNY",
 		},
@@ -88,9 +92,9 @@ func (exampleDriverDefinition) CompileConfig(raw benefit.DriverConfig) (benefit.
 	merchant, err := benefit.NewConstraint(
 		exampleMerchantConstraint,
 		"The coupon is restricted to one merchant.",
-		benefit.ScopeConstraintParams{
+		constraint.ScopeParams{
 			Values: []string{config.MerchantId},
-			Match:  benefit.ScopeMatchAny,
+			Match:  constraint.ScopeMatchAny,
 		},
 	)
 	if err != nil {
@@ -98,16 +102,16 @@ func (exampleDriverDefinition) CompileConfig(raw benefit.DriverConfig) (benefit.
 	}
 
 	constraints := benefit.Constraints{minimum, merchant}
-	constraintRegistry := benefit.NewConstraintRegistry()
+	constraintRegistry := constraint.NewRegistry()
 	if err := constraintRegistry.Register(
-		benefit.ConstraintMinimumAmount,
-		benefit.NewMinimumAmountConstraintEvaluator(extractExampleAmount),
+		constraint.MinimumAmount,
+		constraint.NewMinimumAmountEvaluator(extractExampleAmount),
 	); err != nil {
 		return nil, err
 	}
 	if err := constraintRegistry.Register(
 		exampleMerchantConstraint,
-		benefit.NewScopeConstraintEvaluator(extractExampleMerchant),
+		constraint.NewScopeEvaluator(extractExampleMerchant),
 	); err != nil {
 		return nil, err
 	}
@@ -137,7 +141,7 @@ func parseExampleConfig(raw benefit.DriverConfig) (exampleConfig, error) {
 	return config, nil
 }
 
-func extractExampleAmount(input benefit.EvaluationInput) (benefit.Money, bool, error) {
+func extractExampleAmount(input constraint.Input) (benefit.Money, bool, error) {
 	facts, ok := input.Input.(exampleUseInput)
 	if !ok {
 		return benefit.Money{}, false, fmt.Errorf("unexpected driver input type %T", input.Input)
@@ -145,7 +149,7 @@ func extractExampleAmount(input benefit.EvaluationInput) (benefit.Money, bool, e
 	return facts.Amount, true, nil
 }
 
-func extractExampleMerchant(input benefit.EvaluationInput) ([]string, error) {
+func extractExampleMerchant(input constraint.Input) ([]string, error) {
 	facts, ok := input.Input.(exampleUseInput)
 	if !ok {
 		return nil, fmt.Errorf("unexpected driver input type %T", input.Input)
@@ -156,7 +160,7 @@ func extractExampleMerchant(input benefit.EvaluationInput) ([]string, error) {
 type exampleCouponDriver struct {
 	config             exampleConfig
 	constraints        benefit.Constraints
-	constraintRegistry *benefit.ConstraintRegistry
+	constraintRegistry *constraint.Registry
 }
 
 func (*exampleCouponDriver) Descriptor() benefit.DriverDescriptor {
@@ -204,7 +208,7 @@ func (d *exampleCouponDriver) Evaluate(
 		return benefit.EvaluationResult{}, err
 	}
 
-	result, err := benefit.EvaluateLocalEligibility(ctx, d.constraintRegistry, benefit.EvaluationInput{
+	result, err := evaluation.EvaluateLocalEligibility(ctx, d.constraintRegistry, constraint.Input{
 		Benefit: info,
 		Input:   request.Input,
 	})
@@ -217,13 +221,13 @@ func (d *exampleCouponDriver) Evaluate(
 		return benefit.EvaluationResult{}, fmt.Errorf("unexpected driver input type %T", request.Input)
 	}
 	discountAmount := min(d.config.DiscountAmount, facts.Amount.Amount)
-	result.Outcome = benefit.BenefitOutcome{Discount: &benefit.DiscountEffect{
-		Type:           benefit.DiscountEffectAmount,
-		Currency:       facts.Amount.Currency,
-		OriginalAmount: facts.Amount.Amount,
-		DiscountAmount: discountAmount,
-		PayableAmount:  facts.Amount.Amount - discountAmount,
-	}}
+	effect, err := discount.CalculateAmount(facts.Amount, benefit.Money{
+		Amount: discountAmount,
+	})
+	if err != nil {
+		return benefit.EvaluationResult{}, err
+	}
+	result.Outcome = benefit.BenefitOutcome{Discount: &effect}
 	result.EvaluationToken = "quote-COUPON-001"
 	return result, nil
 }
@@ -303,7 +307,7 @@ func (d *exampleCouponDriver) Reverse(
 
 func Example() {
 	ctx := context.Background()
-	registry := benefit.NewDriverRegistry()
+	registry := driver.NewRegistry()
 	if err := registry.Register(exampleDriverDefinition{}); err != nil {
 		panic(err)
 	}

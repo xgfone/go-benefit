@@ -1,9 +1,7 @@
 package benefit
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -66,37 +64,4 @@ func (r EvaluationResult) Validate() error {
 	}
 
 	return nil
-}
-
-// EvaluateLocalEligibility applies normalized status and constraints.
-func EvaluateLocalEligibility(
-	ctx context.Context,
-	registry *ConstraintRegistry,
-	input EvaluationInput,
-) (EvaluationResult, error) {
-	if registry == nil {
-		registry = DefaultConstraintRegistry
-	}
-
-	if input.Benefit.Status != StatusActive {
-		return EvaluationResult{
-			Eligible: false,
-			Failure: &EvaluationFailure{
-				Code: EvaluationFailureBenefitInactive,
-				Diagnostic: Diagnostic{
-					Reason: fmt.Sprintf("benefit status is %q", input.Benefit.Status),
-				},
-			},
-			Constraints: ConstraintReport{Status: ConstraintReportStatusUnevaluated},
-		}, nil
-	}
-
-	report := registry.EvaluateAll(ctx, input, input.Benefit.Constraints)
-	result := EvaluationResult{Eligible: report.IsSatisfied(), Constraints: report}
-	if !result.Eligible {
-		result.Failure = &EvaluationFailure{
-			Code: EvaluationFailureConstraintUnsatisfied,
-		}
-	}
-	return result, nil
 }
