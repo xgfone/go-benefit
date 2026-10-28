@@ -46,8 +46,8 @@ func TestDriverRegistry(t *testing.T) {
 	if err := registry.Register(definition); err != nil {
 		t.Fatal(err)
 	}
-	if err := registry.Register(definition); err == nil {
-		t.Fatal("duplicate driver registration unexpectedly succeeded")
+	if err := registry.Register(definition); !errors.Is(err, driver.ErrAlreadyRegistered) {
+		t.Fatalf("expected duplicate registration category, got %v", err)
 	}
 
 	descriptors := registry.Descriptors()
@@ -121,8 +121,26 @@ func TestDriverRegistryRejectsMissingOptionalCapability(t *testing.T) {
 	if err := registry.Register(definition); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := registry.Bind("test.missing_reverser", validDriverConfig); err == nil {
-		t.Fatal("driver without its declared optional capability unexpectedly constructed")
+	if _, err := registry.Bind("test.missing_reverser", validDriverConfig); !errors.Is(err, driver.ErrInvalidDefinition) {
+		t.Fatalf("expected invalid definition category for missing Reverser, got %v", err)
+	}
+}
+
+func TestDriverRegistryRejectsMismatchedDescriptor(t *testing.T) {
+	registry := driver.NewRegistry()
+	definition := newFakeDefinition("registered", false, false)
+	boundDescriptor := newFakeDefinition("different", false, false).Descriptor()
+	definition.boundDescriptor = &boundDescriptor
+	if err := registry.Register(definition); err != nil {
+		t.Fatal(err)
+	}
+
+	bound, err := registry.Bind(definition.Descriptor().Type, validDriverConfig)
+	if bound != nil {
+		t.Fatal("binding returned a driver with a mismatched descriptor type")
+	}
+	if !errors.Is(err, driver.ErrInvalidDefinition) {
+		t.Fatalf("expected invalid definition category for mismatched descriptor, got %v", err)
 	}
 }
 
@@ -245,8 +263,9 @@ func TestDriverRegistryRejectsInvalidConfigSchema(t *testing.T) {
 	definition := newFakeDefinition("coupon", false, false)
 	definition.schema.Revision = ""
 	registry := driver.NewRegistry()
-	if err := registry.Register(definition); err == nil {
-		t.Fatal("driver with invalid config schema unexpectedly registered")
+	if err := registry.Register(definition); !errors.Is(err, driver.ErrInvalidDefinition) ||
+		!errors.Is(err, benefit.ErrInvalidConfigSchema) || !errors.Is(err, benefit.ErrValidation) {
+		t.Fatalf("invalid definition lost schema validation categories: %v", err)
 	}
 	if len(registry.Descriptors()) != 0 {
 		t.Fatal("invalid driver was retained in the registry")
@@ -255,8 +274,8 @@ func TestDriverRegistryRejectsInvalidConfigSchema(t *testing.T) {
 
 func TestNilDriverRegistryAndFactory(t *testing.T) {
 	var registry *driver.Registry
-	if err := registry.Register(nil); err == nil {
-		t.Fatal("nil registry unexpectedly accepted a definition")
+	if err := registry.Register(nil); !errors.Is(err, driver.ErrNilRegistry) {
+		t.Fatalf("expected nil registry category, got %v", err)
 	}
 	if registry.Unregister("test.coupon") || registry.Descriptors() != nil {
 		t.Fatal("nil registry unexpectedly contained drivers")
@@ -264,8 +283,8 @@ func TestNilDriverRegistryAndFactory(t *testing.T) {
 	if _, ok := registry.Get("test.coupon"); ok {
 		t.Fatal("nil registry unexpectedly returned a definition")
 	}
-	if err := driver.NewRegistry().Register(nil); err == nil {
-		t.Fatal("nil driver definition unexpectedly registered")
+	if err := driver.NewRegistry().Register(nil); !errors.Is(err, driver.ErrInvalidDefinition) {
+		t.Fatalf("expected invalid definition category for nil definition, got %v", err)
 	}
 	definition := newFakeDefinition("nil_factory", false, false)
 	definition.nilFactory = true
@@ -273,8 +292,8 @@ func TestNilDriverRegistryAndFactory(t *testing.T) {
 	if err := registry.Register(definition); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := registry.Bind("test.nil_factory", validDriverConfig); err == nil {
-		t.Fatal("nil driver factory unexpectedly bound a driver")
+	if _, err := registry.Bind("test.nil_factory", validDriverConfig); !errors.Is(err, driver.ErrInvalidDefinition) {
+		t.Fatalf("expected invalid definition category for nil factory, got %v", err)
 	}
 
 	definition = newFakeDefinition("nil_driver", false, false)
@@ -283,8 +302,8 @@ func TestNilDriverRegistryAndFactory(t *testing.T) {
 	if err := registry.Register(definition); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := registry.Bind("test.nil_driver", validDriverConfig); err == nil {
-		t.Fatal("factory returning a nil driver unexpectedly bound")
+	if _, err := registry.Bind("test.nil_driver", validDriverConfig); !errors.Is(err, driver.ErrInvalidDefinition) {
+		t.Fatalf("expected invalid definition category for nil driver, got %v", err)
 	}
 }
 
@@ -355,6 +374,7 @@ type fakeDefinition struct {
 	schema               benefit.ConfigSchema
 	nilFactory           bool
 	nilDriver            bool
+	boundDescriptor      *benefit.DriverDescriptor
 	validateCalls        atomic.Int64
 	compileCalls         atomic.Int64
 	factoryCalls         atomic.Int64
@@ -424,6 +444,9 @@ func (d *fakeDefinition) CompileConfig(config benefit.DriverConfig) (benefit.Dri
 	}
 
 	descriptor := d.Descriptor()
+	if d.boundDescriptor != nil {
+		descriptor = *d.boundDescriptor
+	}
 	return func() benefit.Driver {
 		d.factoryCalls.Add(1)
 		if d.nilDriver {

@@ -2,7 +2,6 @@ package constraint
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -50,11 +49,11 @@ func (e scopeConstraintEvaluator) Evaluate(
 		return benefit.ConstraintDecision{}, err
 	}
 	if e.extract == nil {
-		return benefit.ConstraintDecision{}, errors.New("benefit: scope values extractor is nil")
+		return benefit.ConstraintDecision{}, fmt.Errorf("%w: scope values extractor is nil", ErrInvalidEvaluator)
 	}
 
 	var params ScopeParams
-	if err := constraint.DecodeParams(&params); err != nil {
+	if err := constraint.UnmarshalParams(&params); err != nil {
 		return invalidConstraint(err.Error()), nil
 	}
 	if len(params.Values) == 0 {

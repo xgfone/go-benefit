@@ -2,7 +2,6 @@ package constraint
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -39,34 +38,37 @@ func NewRegistry() *Registry {
 	}
 }
 
-// NewDefaultRegistry returns a registry containing built-in evaluators.
+// NewDefaultRegistry returns a registry initialized with RegisterBuiltins.
 func NewDefaultRegistry() *Registry {
 	registry := NewRegistry()
-	if err := RegisterBuiltinEvaluators(registry); err != nil {
+	if err := RegisterBuiltins(registry); err != nil {
 		panic(err)
 	}
 	return registry
 }
 
 // Register adds an evaluator and rejects duplicate types.
+// A nil registry returns ErrNilRegistry. Invalid types wrap
+// benefit.ErrValidation; invalid evaluators and duplicate types wrap
+// ErrInvalidEvaluator and ErrAlreadyRegistered respectively.
 func (r *Registry) Register(typ benefit.ConstraintType, evaluator Evaluator) error {
 	if r == nil {
-		return errors.New("benefit: constraint registry is nil")
+		return ErrNilRegistry
 	}
 	if err := typ.Validate(); err != nil {
 		return err
 	}
 	if evaluator == nil {
-		return fmt.Errorf("benefit: evaluator for constraint %q is nil", typ)
+		return fmt.Errorf("%w: evaluator for constraint %q is nil", ErrInvalidEvaluator, typ)
 	}
 	if f, ok := evaluator.(EvaluatorFunc); ok && f == nil {
-		return fmt.Errorf("benefit: evaluator for constraint %q is nil", typ)
+		return fmt.Errorf("%w: evaluator for constraint %q is nil", ErrInvalidEvaluator, typ)
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, exists := r.evaluators[typ]; exists {
-		return fmt.Errorf("benefit: constraint %q is already registered", typ)
+		return fmt.Errorf("%w: %q", ErrAlreadyRegistered, typ)
 	}
 
 	r.evaluators[typ] = evaluator
@@ -116,6 +118,8 @@ func (r *Registry) Types() []benefit.ConstraintType {
 }
 
 // Evaluate evaluates one constraint. Unknown types are explicitly unsatisfied.
+// Evaluator errors are converted into ConstraintDecisionError without exposing
+// their original error or diagnostic text.
 func (r *Registry) Evaluate(
 	ctx context.Context,
 	constraint benefit.Constraint,

@@ -2,7 +2,9 @@
 // built-in evaluators. Definitions, decisions, and aggregate reports belong to
 // the core benefit package.
 //
-// NewRegistry returns an empty registry. NewDefaultRegistry and DefaultRegistry
-// include time-range, weekday, and redemption-limit evaluators. Amount and scope
-// evaluators require application-defined extractors and explicit registration.
+// NewRegistry returns an empty registry. RegisterBuiltins adds only the three
+// evaluators that do not require application-defined extractors: TimeRange,
+// Weekday, and RedemptionLimit. NewDefaultRegistry and DefaultRegistry include
+// the same three evaluators. Amount and scope evaluators require extractors and
+// explicit registration.
 package constraint

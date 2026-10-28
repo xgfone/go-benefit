@@ -2,7 +2,6 @@ package constraint
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -45,7 +44,7 @@ func (e amountConstraintEvaluator) Evaluate(
 		return benefit.ConstraintDecision{}, err
 	}
 	if e.extract == nil {
-		return benefit.ConstraintDecision{}, errors.New("benefit: amount extractor is nil")
+		return benefit.ConstraintDecision{}, fmt.Errorf("%w: amount extractor is nil", ErrInvalidEvaluator)
 	}
 
 	params, invalid := decodeAmountConstraint(constraint)
@@ -66,7 +65,7 @@ func (e amountConstraintEvaluator) Evaluate(
 		return benefit.ConstraintDecision{}, fmt.Errorf("benefit: invalid operation amount: %w", err)
 	}
 	if actual.Amount < 0 {
-		return benefit.ConstraintDecision{}, errors.New("benefit: operation amount must not be negative")
+		return benefit.ConstraintDecision{}, fmt.Errorf("%w: operation amount must not be negative", benefit.ErrValidation)
 	}
 	if decision := compareCurrency(actual.Currency, params.Currency); decision != nil {
 		return *decision, nil
@@ -93,7 +92,7 @@ func (e amountConstraintEvaluator) Evaluate(
 
 func decodeAmountConstraint(constraint benefit.Constraint) (AmountParams, *benefit.ConstraintDecision) {
 	var params AmountParams
-	if err := constraint.DecodeParams(&params); err != nil {
+	if err := constraint.UnmarshalParams(&params); err != nil {
 		decision := invalidConstraint(err.Error())
 		return params, &decision
 	}

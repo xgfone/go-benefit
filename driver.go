@@ -59,18 +59,18 @@ func (d DriverDescriptor) Validate() error {
 		return err
 	}
 	if d.Name == "" {
-		return errors.New("benefit: driver descriptor name is empty")
+		return fmt.Errorf("%w: driver descriptor name is empty", ErrValidation)
 	}
 	if d.Kind.Type == "" {
-		return errors.New("benefit: driver kind type is empty")
+		return fmt.Errorf("%w: driver kind type is empty", ErrValidation)
 	}
 	if d.Provider.Type == "" {
-		return errors.New("benefit: driver provider type is empty")
+		return fmt.Errorf("%w: driver provider type is empty", ErrValidation)
 	}
 
 	if value, expected := d.Type.String(), d.Provider.Type+"."+d.Kind.Type; value != expected {
-		const msg = "benefit: driver type %q must equal provider and kind %q"
-		return fmt.Errorf(msg, d.Type, expected)
+		const msg = "%w: driver type %q must equal provider and kind %q"
+		return fmt.Errorf(msg, ErrValidation, d.Type, expected)
 	}
 
 	if err := d.Operations.Validate(); err != nil {

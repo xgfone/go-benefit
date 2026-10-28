@@ -1,9 +1,6 @@
 package benefit
 
-import (
-	"errors"
-	"fmt"
-)
+import "fmt"
 
 // Validate verifies a normalized status value.
 func (s Status) Validate() error {
@@ -18,14 +15,14 @@ func (s Status) Validate() error {
 		return nil
 
 	default:
-		return fmt.Errorf("benefit: invalid status %q", s)
+		return fmt.Errorf("%w: invalid status %q", ErrValidation, s)
 	}
 }
 
 // Validate verifies the validity window.
 func (v Validity) Validate() error {
 	if !v.StartsAt.IsZero() && !v.ExpiresAt.IsZero() && !v.StartsAt.Before(v.ExpiresAt) {
-		return errors.New("benefit: validity starts_at must be before expires_at")
+		return fmt.Errorf("%w: validity starts_at must be before expires_at", ErrValidation)
 	}
 	return nil
 }
@@ -33,7 +30,7 @@ func (v Validity) Validate() error {
 // Validate verifies non-negative usage counters.
 func (u Usage) Validate() error {
 	if u.RedeemedCount < 0 || u.RemainingCount < 0 {
-		return errors.New("benefit: usage counters must not be negative")
+		return fmt.Errorf("%w: usage counters must not be negative", ErrValidation)
 	}
 	return nil
 }
@@ -41,20 +38,20 @@ func (u Usage) Validate() error {
 // Validate verifies that a notice has display text and its language.
 func (n Notice) Validate() error {
 	if n.Code == "" {
-		return errors.New("benefit: notice code is empty")
+		return fmt.Errorf("%w: notice code is empty", ErrValidation)
 	}
 
 	switch n.Level {
 	case NoticeInfo, NoticeWarning, NoticeError:
 	default:
-		return fmt.Errorf("benefit: invalid notice level %q", n.Level)
+		return fmt.Errorf("%w: invalid notice level %q", ErrValidation, n.Level)
 	}
 
 	if n.Text == "" {
-		return errors.New("benefit: notice text is empty")
+		return fmt.Errorf("%w: notice text is empty", ErrValidation)
 	}
 	if n.Lang == "" {
-		return errors.New("benefit: notice language is empty")
+		return fmt.Errorf("%w: notice language is empty", ErrValidation)
 	}
 
 	return nil
@@ -93,7 +90,7 @@ func (r BenefitReference) IsZero() bool {
 // Validate verifies that a redeem request identifies a benefit.
 func (r RedeemRequest) Validate() error {
 	if r.Reference.IsZero() {
-		return errors.New("benefit: benefit reference is empty")
+		return fmt.Errorf("%w: benefit reference is empty", ErrValidation)
 	}
 	return nil
 }
@@ -102,12 +99,12 @@ func (r RedeemRequest) Validate() error {
 // impose additional requirements such as ProviderRedemptionId.
 func (r ReverseRequest) Validate() error {
 	if r.Reference.IsZero() {
-		return errors.New("benefit: benefit reference is empty")
+		return fmt.Errorf("%w: benefit reference is empty", ErrValidation)
 	}
 	switch r.Mode {
 	case "", OperationModeReverseFull, OperationModeReversePartial:
 	default:
-		return fmt.Errorf("benefit: invalid reverse operation mode %q", r.Mode)
+		return fmt.Errorf("%w: invalid reverse operation mode %q", ErrValidation, r.Mode)
 	}
 	return nil
 }

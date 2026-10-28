@@ -3,6 +3,7 @@ package benefit_test
 import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -54,8 +55,8 @@ func TestSimpleValueValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if test.err == nil {
-				t.Fatal("invalid value unexpectedly validated")
+			if !errors.Is(test.err, benefit.ErrValidation) {
+				t.Fatalf("expected validation category, got %v", test.err)
 			}
 		})
 	}

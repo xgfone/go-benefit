@@ -1,6 +1,7 @@
 package benefit_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/xgfone/go-benefit"
@@ -29,11 +30,11 @@ func TestConstraintReportIsZero(t *testing.T) {
 }
 
 func TestConstraintDefinitionErrors(t *testing.T) {
-	if _, err := benefit.NewConstraint("", "", nil); err == nil {
-		t.Fatal("constraint without a type unexpectedly constructed")
+	if _, err := benefit.NewConstraint("", "", nil); !errors.Is(err, benefit.ErrValidation) {
+		t.Fatalf("expected validation category for empty constraint type, got %v", err)
 	}
-	if _, err := benefit.NewConstraint("test.invalid", "", make(chan int)); err == nil {
-		t.Fatal("constraint with unencodable params unexpectedly constructed")
+	if _, err := benefit.NewConstraint("test.invalid", "", make(chan int)); !errors.Is(err, benefit.ErrInvalidConstraintParams) {
+		t.Fatalf("expected invalid constraint params category, got %v", err)
 	}
 
 	for name, rule := range map[string]benefit.Constraint{
@@ -42,12 +43,15 @@ func TestConstraintDefinitionErrors(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			var params map[string]any
-			if err := rule.DecodeParams(&params); err == nil {
-				t.Fatal("invalid params unexpectedly decoded")
+			err := rule.UnmarshalParams(&params)
+			if !errors.Is(err, benefit.ErrInvalidConstraintParams) {
+				t.Fatalf("expected invalid constraint params category, got %v", err)
 			}
 		})
 	}
-	if err := (benefit.Constraint{Params: []byte(`{}`)}).DecodeParams(nil); err == nil {
-		t.Fatal("nil params destination unexpectedly accepted")
+
+	err := (benefit.Constraint{Params: []byte(`{}`)}).UnmarshalParams(nil)
+	if !errors.Is(err, benefit.ErrValidation) {
+		t.Fatalf("expected validation category for nil destination, got %v", err)
 	}
 }

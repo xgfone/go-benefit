@@ -1,7 +1,6 @@
 package benefit
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 )
@@ -77,7 +76,7 @@ func (capabilities OperationCapabilities) Validate() error {
 			return err
 		}
 		if _, ok := seen[capability.Operation]; ok {
-			return fmt.Errorf("benefit: operation %q is duplicated", capability.Operation)
+			return fmt.Errorf("%w: operation %q is duplicated", ErrValidation, capability.Operation)
 		}
 		seen[capability.Operation] = struct{}{}
 
@@ -86,7 +85,7 @@ func (capabilities OperationCapabilities) Validate() error {
 		}
 		if capability.Operation == OperationReverse &&
 			!containsOperationMode(capability.Modes, OperationModeReverseFull) {
-			return errors.New("benefit: reverse capability must include full mode")
+			return fmt.Errorf("%w: reverse capability must include full mode", ErrValidation)
 		}
 	}
 	return nil
@@ -105,9 +104,9 @@ func (policies OperationPolicies) Validate() error {
 		hasConstraints := len(policy.Constraints) > 0
 		switch {
 		case policy.Disabled && hasConstraints:
-			return fmt.Errorf("benefit: operation %q policy cannot be disabled and conditional", policy.Operation)
+			return fmt.Errorf("%w: operation %q policy cannot be disabled and conditional", ErrValidation, policy.Operation)
 		case !policy.Disabled && !hasConstraints:
-			return fmt.Errorf("benefit: operation %q policy has no effect", policy.Operation)
+			return fmt.Errorf("%w: operation %q policy has no effect", ErrValidation, policy.Operation)
 		}
 	}
 	return nil
@@ -115,10 +114,10 @@ func (policies OperationPolicies) Validate() error {
 
 func validateOptionalOperation(operation Operation, index int) error {
 	if operation == "" {
-		return fmt.Errorf("benefit: operation at index %d is empty", index)
+		return fmt.Errorf("%w: operation at index %d is empty", ErrValidation, index)
 	}
 	if operation.IsCore() {
-		return fmt.Errorf("benefit: core operation %q must not be declared", operation)
+		return fmt.Errorf("%w: core operation %q must not be declared", ErrValidation, operation)
 	}
 	return nil
 }
@@ -127,15 +126,15 @@ func validateOperationModes(operation Operation, modes []OperationMode) error {
 	seen := make(map[OperationMode]struct{}, len(modes))
 	for _, mode := range modes {
 		if mode == "" {
-			return fmt.Errorf("benefit: operation %q has an empty mode", operation)
+			return fmt.Errorf("%w: operation %q has an empty mode", ErrValidation, operation)
 		}
 		if _, ok := seen[mode]; ok {
-			return fmt.Errorf("benefit: operation %q mode %q is duplicated", operation, mode)
+			return fmt.Errorf("%w: operation %q mode %q is duplicated", ErrValidation, operation, mode)
 		}
 		if operation == OperationReverse &&
 			mode != OperationModeReverseFull &&
 			mode != OperationModeReversePartial {
-			return fmt.Errorf("benefit: reverse operation has unsupported mode %q", mode)
+			return fmt.Errorf("%w: reverse operation has unsupported mode %q", ErrValidation, mode)
 		}
 		seen[mode] = struct{}{}
 	}
@@ -192,7 +191,7 @@ func (s OperationDecisionStatus) Validate() error {
 		return nil
 
 	default:
-		return fmt.Errorf("benefit: invalid operation decision status %q", s)
+		return fmt.Errorf("%w: invalid operation decision status %q", ErrValidation, s)
 	}
 }
 
@@ -224,7 +223,7 @@ func (d OperationDecision) IsEligible() bool {
 // and constraint report.
 func (d OperationDecision) Validate() error {
 	if d.Operation == "" {
-		return errors.New("benefit: operation decision operation is empty")
+		return fmt.Errorf("%w: operation decision operation is empty", ErrValidation)
 	}
 	if err := d.Status.Validate(); err != nil {
 		return err
@@ -233,20 +232,20 @@ func (d OperationDecision) Validate() error {
 	switch d.Status {
 	case OperationDecisionStatusUnsupported:
 		if d.Constraints.Status != ConstraintReportStatusUnevaluated {
-			return errors.New("benefit: unsupported operation has evaluated constraints")
+			return fmt.Errorf("%w: unsupported operation has evaluated constraints", ErrValidation)
 		}
 
 	case OperationDecisionStatusIneligible:
 		if d.Constraints.Status != ConstraintReportStatusUnsatisfied {
-			return errors.New("benefit: ineligible operation has no unsatisfied constraints")
+			return fmt.Errorf("%w: ineligible operation has no unsatisfied constraints", ErrValidation)
 		}
 
 	case OperationDecisionStatusEligible:
 		if d.Constraints.Status != ConstraintReportStatusSatisfied {
-			return errors.New("benefit: eligible operation has unsatisfied constraints")
+			return fmt.Errorf("%w: eligible operation has unsatisfied constraints", ErrValidation)
 		}
 		if d.Reason != "" || len(d.Details) > 0 {
-			return errors.New("benefit: eligible operation has diagnostic information")
+			return fmt.Errorf("%w: eligible operation has diagnostic information", ErrValidation)
 		}
 	}
 	return nil

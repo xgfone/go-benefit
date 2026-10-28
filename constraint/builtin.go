@@ -2,10 +2,10 @@ package constraint
 
 import "github.com/xgfone/go-benefit"
 
-// RegisterBuiltinEvaluators registers context-independent constraint
-// evaluators. Provider- and application-defined constraints are intentionally
-// excluded because the package cannot safely assume their input schemas.
-func RegisterBuiltinEvaluators(registry *Registry) error {
+// RegisterBuiltins registers the three built-in evaluators that do not require
+// application-defined extractors: TimeRange, Weekday, and RedemptionLimit.
+// Amount and scope evaluators require extractors and explicit registration.
+func RegisterBuiltins(registry *Registry) error {
 	registrations := []struct {
 		typ       benefit.ConstraintType
 		evaluator Evaluator

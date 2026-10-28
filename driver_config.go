@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
-	"errors"
 	"fmt"
 	"strings"
 	"unicode/utf8"
@@ -23,6 +22,7 @@ func (c DriverConfig) IsZero() bool {
 }
 
 // Validate verifies that a non-empty configuration is a UTF-8 JSON object.
+// Errors wrap ErrInvalidDriverConfig and preserve any JSON decoding error.
 func (c DriverConfig) Validate() error {
 	if c == "" {
 		return nil
@@ -30,17 +30,17 @@ func (c DriverConfig) Validate() error {
 
 	value := string(c)
 	if !utf8.ValidString(value) {
-		return errors.New("benefit: driver config is not valid UTF-8")
+		return fmt.Errorf("%w: not valid UTF-8", ErrInvalidDriverConfig)
 	}
 
 	value = strings.TrimSpace(value)
 	if len(value) < 2 || value[0] != '{' || value[len(value)-1] != '}' {
-		return errors.New("benefit: driver config is not a JSON object")
+		return fmt.Errorf("%w: not a JSON object", ErrInvalidDriverConfig)
 	}
 
 	var object map[string]jsontext.Value
 	if err := json.Unmarshal([]byte(value), &object); err != nil {
-		return fmt.Errorf("benefit: driver config is not a JSON object: %w", err)
+		return fmt.Errorf("%w: not a JSON object: %w", ErrInvalidDriverConfig, err)
 	}
 
 	return nil
@@ -61,40 +61,41 @@ func (s ConfigSchema) Clone() ConfigSchema {
 }
 
 // Validate verifies the schema envelope and its required root declarations.
+// Errors wrap ErrInvalidConfigSchema and preserve any JSON decoding error.
 func (s ConfigSchema) Validate() error {
 	if strings.TrimSpace(s.Revision) == "" {
-		return errors.New("benefit: config schema revision is empty")
+		return fmt.Errorf("%w: revision is empty", ErrInvalidConfigSchema)
 	}
 	if len(s.Schema) == 0 {
-		return errors.New("benefit: config schema document is empty")
+		return fmt.Errorf("%w: document is empty", ErrInvalidConfigSchema)
 	}
 
 	var root map[string]jsontext.Value
 	if err := json.Unmarshal(s.Schema, &root); err != nil {
-		return fmt.Errorf("benefit: config schema document is invalid: %w", err)
+		return fmt.Errorf("%w: document is invalid: %w", ErrInvalidConfigSchema, err)
 	}
 	if root == nil {
-		return errors.New("benefit: config schema document is not an object")
+		return fmt.Errorf("%w: document is not an object", ErrInvalidConfigSchema)
 	}
 
 	var dialect string
 	if raw := root["$schema"]; len(raw) == 0 {
-		return errors.New("benefit: config schema has no $schema declaration")
+		return fmt.Errorf("%w: no $schema declaration", ErrInvalidConfigSchema)
 	} else if err := json.Unmarshal(raw, &dialect); err != nil {
-		return errors.New("benefit: config schema $schema declaration is not a string")
+		return fmt.Errorf("%w: $schema declaration is not a string: %w", ErrInvalidConfigSchema, err)
 	}
 	if dialect != JsonSchemaDraft202012 {
-		return fmt.Errorf("benefit: unsupported config schema dialect %q", dialect)
+		return fmt.Errorf("%w: unsupported dialect %q", ErrInvalidConfigSchema, dialect)
 	}
 
 	var rootType string
 	if raw := root["type"]; len(raw) == 0 {
-		return errors.New("benefit: config schema has no root type")
+		return fmt.Errorf("%w: no root type", ErrInvalidConfigSchema)
 	} else if err := json.Unmarshal(raw, &rootType); err != nil {
-		return errors.New("benefit: config schema root type is not a string")
+		return fmt.Errorf("%w: root type is not a string: %w", ErrInvalidConfigSchema, err)
 	}
 	if rootType != "object" {
-		return fmt.Errorf("benefit: config schema root type is %q, want object", rootType)
+		return fmt.Errorf("%w: root type is %q, want object", ErrInvalidConfigSchema, rootType)
 	}
 	return nil
 }

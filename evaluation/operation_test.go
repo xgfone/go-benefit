@@ -3,6 +3,7 @@ package evaluation_test
 import (
 	"context"
 	"encoding/json/v2"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -21,8 +22,8 @@ func TestEvaluateOperationRejectsCoreOperation(t *testing.T) {
 		benefit.OperationRedeem,
 		"",
 		constraint.Input{},
-	); err == nil {
-		t.Fatal("core operation unexpectedly used optional capability evaluation")
+	); !errors.Is(err, benefit.ErrValidation) {
+		t.Fatalf("expected validation category for core operation, got %v", err)
 	}
 }
 
@@ -30,7 +31,7 @@ func TestEvaluateOperationRejectsNilRegistry(t *testing.T) {
 	_, err := evaluation.EvaluateOperation(
 		context.Background(), nil, nil, nil, benefit.OperationReverse, "", constraint.Input{},
 	)
-	if err == nil || err.Error() != "benefit: constraint registry is nil" {
+	if !errors.Is(err, constraint.ErrNilRegistry) {
 		t.Fatalf("unexpected nil registry error: %v", err)
 	}
 }
@@ -259,8 +260,8 @@ func TestEvaluateOperationRejectsPoliciesOutsideCapability(t *testing.T) {
 				benefit.OperationReverse,
 				benefit.OperationModeReverseFull,
 				constraint.Input{},
-			); err == nil {
-				t.Fatal("operation policy outside driver capability unexpectedly evaluated")
+			); !errors.Is(err, benefit.ErrValidation) {
+				t.Fatalf("expected validation category for policy outside driver capability, got %v", err)
 			}
 		})
 	}

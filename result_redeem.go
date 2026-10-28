@@ -1,7 +1,6 @@
 package benefit
 
 import (
-	"errors"
 	"fmt"
 	"time"
 )
@@ -76,10 +75,10 @@ func (r RedeemResult) Validate() error {
 	switch r.Status {
 	case ResultStatusSuccess:
 		if r.Redemption == nil {
-			return errors.New("benefit: successful redeem result has no redemption")
+			return fmt.Errorf("%w: successful redeem result has no redemption", ErrValidation)
 		}
 		if r.Failure != nil {
-			return errors.New("benefit: successful redeem result has a failure")
+			return fmt.Errorf("%w: successful redeem result has a failure", ErrValidation)
 		}
 		if err := r.Redemption.Validate(); err != nil {
 			return err
@@ -87,22 +86,22 @@ func (r RedeemResult) Validate() error {
 
 	case ResultStatusFailure:
 		if r.Failure == nil {
-			return errors.New("benefit: failed redeem result has no failure")
+			return fmt.Errorf("%w: failed redeem result has no failure", ErrValidation)
 		}
 		if r.Redemption != nil {
-			return errors.New("benefit: failed redeem result has a redemption")
+			return fmt.Errorf("%w: failed redeem result has a redemption", ErrValidation)
 		}
 
 	case ResultStatusPending, ResultStatusUnknown:
 		if r.Failure != nil {
-			return fmt.Errorf("benefit: %s redeem result must not claim a confirmed failure", r.Status)
+			return fmt.Errorf("%w: %s redeem result must not claim a confirmed failure", ErrValidation, r.Status)
 		}
 		if r.Redemption != nil {
-			return fmt.Errorf("benefit: %s redeem result has a redemption", r.Status)
+			return fmt.Errorf("%w: %s redeem result has a redemption", ErrValidation, r.Status)
 		}
 
 	default:
-		return fmt.Errorf("benefit: invalid redeem result status %q", r.Status)
+		return fmt.Errorf("%w: invalid redeem result status %q", ErrValidation, r.Status)
 	}
 	return nil
 }

@@ -1,6 +1,6 @@
 package benefit
 
-import "errors"
+import "fmt"
 
 // BenefitOutcome describes the value projected or delivered by applying one
 // benefit. Additional normalized outcome categories can be added without
@@ -50,7 +50,7 @@ func (r BenefitRestoration) Validate() error {
 			return err
 		}
 		if r.Money.Amount < 0 {
-			return errors.New("benefit: restored amount must not be negative")
+			return fmt.Errorf("%w: restored amount must not be negative", ErrValidation)
 		}
 	}
 	return nil

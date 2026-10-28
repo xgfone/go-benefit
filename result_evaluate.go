@@ -1,7 +1,7 @@
 package benefit
 
 import (
-	"errors"
+	"fmt"
 	"time"
 )
 
@@ -47,20 +47,20 @@ type EvaluationResult struct {
 func (r EvaluationResult) Validate() error {
 	if r.Eligible {
 		if r.Failure != nil {
-			return errors.New("benefit: eligible evaluation has a failure")
+			return fmt.Errorf("%w: eligible evaluation has a failure", ErrValidation)
 		}
 		if r.Constraints.Status == ConstraintReportStatusUnsatisfied {
-			return errors.New("benefit: eligible evaluation has unsatisfied constraints")
+			return fmt.Errorf("%w: eligible evaluation has unsatisfied constraints", ErrValidation)
 		}
 		return r.Outcome.Validate()
 	}
 
 	if r.Failure == nil || r.Failure.Code == "" {
-		return errors.New("benefit: ineligible evaluation has no failure code")
+		return fmt.Errorf("%w: ineligible evaluation has no failure code", ErrValidation)
 	}
 
 	if !r.Outcome.IsZero() {
-		return errors.New("benefit: ineligible evaluation has an outcome")
+		return fmt.Errorf("%w: ineligible evaluation has an outcome", ErrValidation)
 	}
 
 	return nil

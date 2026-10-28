@@ -1,6 +1,7 @@
 package benefit_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/xgfone/go-benefit"
@@ -44,8 +45,8 @@ func TestOperationCapabilitiesValidation(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := test.capabilities.Validate(); err == nil {
-				t.Fatal("invalid operation capabilities unexpectedly validated")
+			if err := test.capabilities.Validate(); !errors.Is(err, benefit.ErrValidation) {
+				t.Fatalf("expected validation category, got %v", err)
 			}
 		})
 	}
@@ -67,8 +68,8 @@ func TestOperationPoliciesValidation(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := test.policies.Validate(); err == nil {
-				t.Fatal("invalid operation policies unexpectedly validated")
+			if err := test.policies.Validate(); !errors.Is(err, benefit.ErrValidation) {
+				t.Fatalf("expected validation category, got %v", err)
 			}
 		})
 	}
@@ -106,8 +107,8 @@ func TestOperationDecisionRejectsInvalidStatusCombination(t *testing.T) {
 	}
 	for name, decision := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := decision.Validate(); err == nil {
-				t.Fatal("invalid operation decision unexpectedly validated")
+			if err := decision.Validate(); !errors.Is(err, benefit.ErrValidation) {
+				t.Fatalf("expected validation category, got %v", err)
 			}
 		})
 	}
@@ -141,8 +142,12 @@ func TestResultStatusValidation(t *testing.T) {
 	}
 	for _, test := range redeemTests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := test.result.Validate(); (err == nil) != test.valid {
+			err := test.result.Validate()
+			if (err == nil) != test.valid {
 				t.Fatalf("unexpected validation result: %v", err)
+			}
+			if !test.valid && !errors.Is(err, benefit.ErrValidation) {
+				t.Fatalf("invalid redeem result lost validation category: %v", err)
 			}
 		})
 	}
@@ -167,8 +172,12 @@ func TestResultStatusValidation(t *testing.T) {
 	}
 	for _, test := range reverseTests {
 		t.Run("reverse "+test.name, func(t *testing.T) {
-			if err := test.result.Validate(); (err == nil) != test.valid {
+			err := test.result.Validate()
+			if (err == nil) != test.valid {
 				t.Fatalf("unexpected validation result: %v", err)
+			}
+			if !test.valid && !errors.Is(err, benefit.ErrValidation) {
+				t.Fatalf("invalid reverse result lost validation category: %v", err)
 			}
 		})
 	}

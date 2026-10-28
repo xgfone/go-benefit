@@ -1,9 +1,6 @@
 package benefit
 
-import (
-	"errors"
-	"fmt"
-)
+import "fmt"
 
 // Money stores an integer amount and its optional ISO 4217 currency code.
 // The containing model defines the meaning of an empty currency.
@@ -19,6 +16,7 @@ func (m Money) IsZero() bool {
 
 // Validate verifies the syntax of a non-empty currency. ISO 4217 membership
 // and major/minor-unit conversion are the caller's responsibility.
+// Invalid syntax wraps ErrInvalidCurrency.
 func (m Money) Validate() error {
 	return validateCurrencyCode(m.Currency)
 }
@@ -53,20 +51,20 @@ func (e DiscountEffect) Validate() error {
 		DiscountEffectPercentage:
 
 	default:
-		return fmt.Errorf("benefit: invalid discount effect type %q", e.Type)
+		return fmt.Errorf("%w: invalid discount effect type %q", ErrValidation, e.Type)
 	}
 
 	if err := validateCurrencyCode(e.Currency); err != nil {
 		return err
 	}
 	if e.OriginalAmount < 0 || e.DiscountAmount < 0 || e.PayableAmount < 0 {
-		return errors.New("benefit: discount effect amounts must not be negative")
+		return fmt.Errorf("%w: discount effect amounts must not be negative", ErrValidation)
 	}
 	if e.PayableAmount > e.OriginalAmount || e.OriginalAmount != e.PayableAmount+e.DiscountAmount {
-		return errors.New("benefit: discount effect amounts are inconsistent")
+		return fmt.Errorf("%w: discount effect amounts are inconsistent", ErrValidation)
 	}
 	if e.Type == DiscountEffectFree && e.PayableAmount != 0 {
-		return errors.New("benefit: free effect must have a zero payable amount")
+		return fmt.Errorf("%w: free effect must have a zero payable amount", ErrValidation)
 	}
 
 	return nil
@@ -80,11 +78,11 @@ func validateCurrencyCode(code string) error {
 		return nil
 	}
 	if len(code) != 3 {
-		return fmt.Errorf("benefit: invalid ISO 4217 currency code %q", code)
+		return fmt.Errorf("%w %q", ErrInvalidCurrency, code)
 	}
 	for i := range len(code) {
 		if (code[i] < 'A' || code[i] > 'Z') && (code[i] < 'a' || code[i] > 'z') {
-			return fmt.Errorf("benefit: invalid ISO 4217 currency code %q", code)
+			return fmt.Errorf("%w %q", ErrInvalidCurrency, code)
 		}
 	}
 	return nil

@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -28,23 +27,25 @@ func NewRegistry() *Registry {
 }
 
 // Register adds a driver definition and rejects duplicate driver types.
+// Errors wrap ErrInvalidDefinition or ErrAlreadyRegistered; a nil registry
+// returns ErrNilRegistry. Descriptor validation errors are preserved.
 func (r *Registry) Register(definition benefit.DriverDefinition) error {
 	if r == nil {
-		return errors.New("benefit: driver registry is nil")
+		return ErrNilRegistry
 	}
 	if definition == nil {
-		return errors.New("benefit: driver definition is nil")
+		return fmt.Errorf("%w: definition is nil", ErrInvalidDefinition)
 	}
 
 	descriptor := definition.Descriptor()
 	if err := descriptor.Validate(); err != nil {
-		return err
+		return fmt.Errorf("%w: driver %q: %w", ErrInvalidDefinition, descriptor.Type, err)
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, exists := r.definitions[descriptor.Type]; exists {
-		return fmt.Errorf("benefit: driver type %q is already registered", descriptor.Type)
+		return fmt.Errorf("%w: %q", ErrAlreadyRegistered, descriptor.Type)
 	}
 
 	r.definitions[descriptor.Type] = registeredDriverDefinition{
@@ -123,27 +124,32 @@ func (r *Registry) getDescriptors() []benefit.DriverDescriptor {
 }
 
 // ValidateConfig validates configuration before a driver instance is persisted.
+// Errors wrap ErrNotRegistered or benefit.ErrInvalidDriverConfig. Errors from
+// the definition are preserved alongside the configuration category.
 func (r *Registry) ValidateConfig(driverType benefit.DriverType, config benefit.DriverConfig) error {
 	registered, ok := r.get(driverType)
 	if !ok {
-		return fmt.Errorf("benefit: driver type %q is not registered", driverType)
+		return fmt.Errorf("%w: %q", ErrNotRegistered, driverType)
 	}
 
 	if err := config.Validate(); err != nil {
 		return err
 	}
 	if err := registered.definition.ValidateConfig(config); err != nil {
-		return fmt.Errorf("benefit: validate driver %q config: %w", driverType, err)
+		return fmt.Errorf("%w: validate driver %q: %w", benefit.ErrInvalidDriverConfig, driverType, err)
 	}
 
 	return nil
 }
 
 // Bind compiles configuration and constructs a lightweight provider-bound driver.
+// Errors wrap ErrNotRegistered, benefit.ErrInvalidDriverConfig, or
+// ErrInvalidDefinition. Compilation errors are preserved alongside the
+// configuration category.
 func (r *Registry) Bind(driverType benefit.DriverType, config benefit.DriverConfig) (benefit.Driver, error) {
 	registered, ok := r.get(driverType)
 	if !ok {
-		return nil, fmt.Errorf("benefit: driver type %q is not registered", driverType)
+		return nil, fmt.Errorf("%w: %q", ErrNotRegistered, driverType)
 	}
 
 	if err := config.Validate(); err != nil {
@@ -152,21 +158,21 @@ func (r *Registry) Bind(driverType benefit.DriverType, config benefit.DriverConf
 
 	factory, err := registered.definition.CompileConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("benefit: compile driver %q config: %w", driverType, err)
+		return nil, fmt.Errorf("%w: compile driver %q: %w", benefit.ErrInvalidDriverConfig, driverType, err)
 	}
 	if factory == nil {
-		return nil, fmt.Errorf("benefit: driver definition %q returned a nil factory", driverType)
+		return nil, fmt.Errorf("%w: driver %q returned a nil factory", ErrInvalidDefinition, driverType)
 	}
 
 	driver := factory()
 	if driver == nil {
-		return nil, fmt.Errorf("benefit: driver factory %q returned nil", driverType)
+		return nil, fmt.Errorf("%w: driver factory %q returned nil", ErrInvalidDefinition, driverType)
 	}
 
 	descriptor := driver.Descriptor()
 	if descriptor.Type != registered.descriptor.Type {
-		const msg = "benefit: driver %q returned descriptor for type %q"
-		return nil, fmt.Errorf(msg, driverType, descriptor.Type)
+		const msg = "%w: driver %q returned descriptor for type %q"
+		return nil, fmt.Errorf(msg, ErrInvalidDefinition, driverType, descriptor.Type)
 	}
 
 	if err := validateDriverOperation[benefit.Reverser](driver, benefit.OperationReverse); err != nil {
@@ -186,8 +192,8 @@ func validateDriverOperation[T any](driver benefit.Driver, op benefit.Operation)
 		return nil
 	}
 
-	const msg = "benefit: driver %q declares %q but does not implement Reverser"
-	return fmt.Errorf(msg, driver.Descriptor().Type, benefit.OperationReverse)
+	const msg = "%w: driver %q declares %q but does not implement Reverser"
+	return fmt.Errorf(msg, ErrInvalidDefinition, driver.Descriptor().Type, benefit.OperationReverse)
 }
 
 func cloneDriverDescriptor(descriptor benefit.DriverDescriptor) benefit.DriverDescriptor {

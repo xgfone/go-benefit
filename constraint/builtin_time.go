@@ -30,7 +30,7 @@ func evaluateTimeRange(
 	}
 
 	var params TimeRangeParams
-	if err := constraint.DecodeParams(&params); err != nil {
+	if err := constraint.UnmarshalParams(&params); err != nil {
 		return invalidConstraint(err.Error()), nil
 	}
 	if params.StartsAt.IsZero() && params.ExpiresAt.IsZero() {
@@ -54,7 +54,7 @@ func evaluateWeekday(ctx context.Context, constraint benefit.Constraint, input I
 	}
 
 	var params WeekdayParams
-	if err := constraint.DecodeParams(&params); err != nil {
+	if err := constraint.UnmarshalParams(&params); err != nil {
 		return invalidConstraint(err.Error()), nil
 	}
 	if len(params.Weekdays) == 0 {

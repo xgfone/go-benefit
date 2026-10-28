@@ -3,7 +3,6 @@ package benefit
 import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
-	"errors"
 	"fmt"
 )
 
@@ -26,32 +25,36 @@ type Constraint struct {
 type Constraints []Constraint
 
 // NewConstraint JSON-encodes params into a constraint definition.
+// An empty type wraps ErrValidation. Encoding failures wrap
+// ErrInvalidConstraintParams and preserve the original error.
 func NewConstraint(typ ConstraintType, remark string, params any) (Constraint, error) {
 	if typ == "" {
-		return Constraint{}, errors.New("benefit: constraint type is empty")
+		return Constraint{}, fmt.Errorf("%w: constraint type is empty", ErrValidation)
 	}
 
 	var raw jsontext.Value
 	if params != nil {
 		data, err := json.Marshal(params)
 		if err != nil {
-			return Constraint{}, fmt.Errorf("benefit: encode constraint %q params: %w", typ, err)
+			return Constraint{}, fmt.Errorf("%w: encode constraint %q: %w", ErrInvalidConstraintParams, typ, err)
 		}
 		raw = data
 	}
 	return Constraint{Type: typ, Remark: remark, Params: raw}, nil
 }
 
-// DecodeParams decodes the constraint parameters into out.
-func (c Constraint) DecodeParams(out any) error {
+// UnmarshalParams unmarshals the JSON constraint parameters into out.
+// A nil destination wraps ErrValidation. Missing or undecodable parameters
+// wrap ErrInvalidConstraintParams and preserve any JSON decoding error.
+func (c Constraint) UnmarshalParams(out any) error {
 	if out == nil {
-		return errors.New("benefit: constraint params destination is nil")
+		return fmt.Errorf("%w: constraint params destination is nil", ErrValidation)
 	}
 	if len(c.Params) == 0 {
-		return errors.New("benefit: constraint params are empty")
+		return fmt.Errorf("%w: constraint params are empty", ErrInvalidConstraintParams)
 	}
 	if err := json.Unmarshal(c.Params, out); err != nil {
-		return fmt.Errorf("benefit: decode constraint %q params: %w", c.Type, err)
+		return fmt.Errorf("%w: unmarshal constraint %q: %w", ErrInvalidConstraintParams, c.Type, err)
 	}
 	return nil
 }

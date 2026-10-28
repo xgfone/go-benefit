@@ -60,8 +60,8 @@ func TestUnregisteredConstraintTypeIsUnrecognized(t *testing.T) {
 
 func TestConstraintRegistryLifecycle(t *testing.T) {
 	var nilRegistry *constraint.Registry
-	if err := nilRegistry.Register("test.rule", constraint.EvaluatorFunc(nil)); err == nil {
-		t.Fatal("nil registry unexpectedly accepted a registration")
+	if err := nilRegistry.Register("test.rule", constraint.EvaluatorFunc(nil)); !errors.Is(err, constraint.ErrNilRegistry) {
+		t.Fatalf("expected nil registry category, got %v", err)
 	}
 	if nilRegistry.Unregister("test.rule") || nilRegistry.Types() != nil {
 		t.Fatal("nil registry unexpectedly contained constraints")
@@ -545,12 +545,17 @@ func mustConstraint(t *testing.T, typ benefit.ConstraintType, params any) benefi
 }
 
 func TestDefaultConstraintRegistryContents(t *testing.T) {
+	registered := constraint.NewRegistry()
+	if err := constraint.RegisterBuiltins(registered); err != nil {
+		t.Fatal(err)
+	}
 	want := []benefit.ConstraintType{
 		"benefit.redemption_limit",
 		"benefit.time_range",
 		"benefit.weekday",
 	}
 	for _, registry := range []*constraint.Registry{
+		registered,
 		constraint.DefaultRegistry,
 		constraint.NewDefaultRegistry(),
 	} {

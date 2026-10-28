@@ -21,7 +21,7 @@ func evaluateRedemptionLimit(
 	}
 
 	var params RedemptionLimitParams
-	if err := constraint.DecodeParams(&params); err != nil {
+	if err := constraint.UnmarshalParams(&params); err != nil {
 		return invalidConstraint(err.Error()), nil
 	}
 	if params.MaxCount <= 0 {

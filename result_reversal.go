@@ -1,7 +1,6 @@
 package benefit
 
 import (
-	"errors"
 	"fmt"
 	"time"
 )
@@ -71,10 +70,10 @@ func (r ReverseResult) Validate() error {
 	switch r.Status {
 	case ResultStatusSuccess:
 		if r.Reversal == nil {
-			return errors.New("benefit: successful reverse result has no reversal")
+			return fmt.Errorf("%w: successful reverse result has no reversal", ErrValidation)
 		}
 		if r.Failure != nil {
-			return errors.New("benefit: successful reverse result has a failure")
+			return fmt.Errorf("%w: successful reverse result has a failure", ErrValidation)
 		}
 		if err := r.Reversal.Validate(); err != nil {
 			return err
@@ -82,22 +81,22 @@ func (r ReverseResult) Validate() error {
 
 	case ResultStatusFailure:
 		if r.Failure == nil {
-			return errors.New("benefit: failed reverse result has no failure")
+			return fmt.Errorf("%w: failed reverse result has no failure", ErrValidation)
 		}
 		if r.Reversal != nil {
-			return errors.New("benefit: failed reverse result has a reversal")
+			return fmt.Errorf("%w: failed reverse result has a reversal", ErrValidation)
 		}
 
 	case ResultStatusPending, ResultStatusUnknown:
 		if r.Failure != nil {
-			return fmt.Errorf("benefit: %s reverse result must not claim a confirmed failure", r.Status)
+			return fmt.Errorf("%w: %s reverse result must not claim a confirmed failure", ErrValidation, r.Status)
 		}
 		if r.Reversal != nil {
-			return fmt.Errorf("benefit: %s reverse result has a reversal", r.Status)
+			return fmt.Errorf("%w: %s reverse result has a reversal", ErrValidation, r.Status)
 		}
 
 	default:
-		return fmt.Errorf("benefit: invalid reverse result status %q", r.Status)
+		return fmt.Errorf("%w: invalid reverse result status %q", ErrValidation, r.Status)
 	}
 	return nil
 }

@@ -48,7 +48,7 @@ depends on `constraint`. The core does not import any functional subpackage or
 initialize their default registries.
 
 Model methods such as `Validate`, `IsZero`, and `IsSatisfied`, along with
-`NewConstraint` and `Constraint.DecodeParams`, remain in `benefit`.
+`NewConstraint` and `Constraint.UnmarshalParams`, remain in `benefit`.
 
 ## Driver lifecycle
 
@@ -174,13 +174,15 @@ facts extracted from `DriverInput` with the same constraint mechanism.
 A driver should return a merchant, store, or product mismatch as a
 `constraint.unsatisfied` business result, not as an unsupported operation.
 
-`constraint.NewRegistry` creates an empty registry. `constraint.NewDefaultRegistry`
-and the shared `constraint.DefaultRegistry` include context-independent time-range,
-weekday, and redemption-limit evaluators. Amount and scope evaluators require
-application-defined extractors so the package does not need a universal
-transaction structure. A currency-wildcard amount constraint applies the same
-integer threshold in the actual currency's minor-unit convention; it does not
-perform precision or exchange-rate conversion.
+`constraint.NewRegistry` creates an empty registry.
+`constraint.RegisterBuiltins(registry)` registers only the three built-in
+evaluators that do not require application-defined extractors: `TimeRange`,
+`Weekday`, and `RedemptionLimit`. `constraint.NewDefaultRegistry` and the shared
+`constraint.DefaultRegistry` include the same three evaluators. Amount and scope
+evaluators require application-defined extractors and explicit registration, so
+the package does not need a universal transaction structure. A currency-wildcard
+amount constraint applies the same integer threshold in the actual currency's
+minor-unit convention; it does not perform precision or exchange-rate conversion.
 
 Evaluators implement `constraint.Evaluator` and receive a `constraint.Input`
 containing the benefit snapshot, application input, and optional evaluation time.
@@ -241,6 +243,28 @@ accepted but pending work, and an unknown outcome. Provider timeouts must not
 be reported as confirmed failures when the remote operation may have completed.
 Go errors are reserved for local invocation or integration failures that do not
 express a confirmed provider business result.
+
+Use `errors.Is` to classify Go errors, including errors wrapped by the caller.
+Core model and request validation errors match `benefit.ErrValidation`.
+Configuration, schema, currency syntax, and constraint parameter failures also
+match `benefit.ErrInvalidDriverConfig`, `benefit.ErrInvalidConfigSchema`,
+`benefit.ErrInvalidCurrency`, and `benefit.ErrInvalidConstraintParams`,
+respectively. JSON encoding and decoding errors remain available to `errors.As`.
+Error messages provide diagnostic context and are not stable machine identifiers.
+
+The `driver` package exposes `ErrNotRegistered`, `ErrAlreadyRegistered`,
+`ErrInvalidDefinition`, and `ErrNilRegistry`. Driver-specific configuration
+validation and compilation errors preserve their original causes while also
+matching `benefit.ErrInvalidDriverConfig`.
+The `constraint` package exposes `ErrAlreadyRegistered`, `ErrInvalidEvaluator`,
+and `ErrNilRegistry`; `evaluation.EvaluateOperation` reuses that same nil-registry
+error. Direct evaluator calls preserve their errors, while registry evaluation
+converts them into `ConstraintDecisionError` without exposing the original cause.
+
+Discount calculation errors distinguish `discount.ErrCurrencyMismatch`,
+`discount.ErrInvalidAmount`, `discount.ErrDiscountExceedsOriginal`, and
+`discount.ErrInvalidBasisPoints`; each also matches `benefit.ErrValidation`.
+Invalid currency syntax continues to match `benefit.ErrInvalidCurrency`.
 
 Failure `Code` values are stable machine identifiers for program logic and
 client localization. `Diagnostic.Reason` and `Diagnostic.Details` contain

@@ -2,7 +2,6 @@ package evaluation
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -14,6 +13,8 @@ import (
 // benefit-specific policies, and evaluates their availability constraints.
 // An empty mode evaluates the operation as a whole and does not match
 // mode-specific policies. A nil registry is rejected.
+// A nil registry returns constraint.ErrNilRegistry; invalid capability,
+// policy, or operation arguments wrap benefit.ErrValidation.
 func EvaluateOperation(
 	ctx context.Context,
 	registry *constraint.Registry,
@@ -24,11 +25,11 @@ func EvaluateOperation(
 	input constraint.Input,
 ) (benefit.OperationDecision, error) {
 	if operation.IsCore() {
-		const msg = "benefit: core operation %q does not require capability evaluation"
-		return benefit.OperationDecision{}, fmt.Errorf(msg, operation)
+		const msg = "%w: core operation %q does not require capability evaluation"
+		return benefit.OperationDecision{}, fmt.Errorf(msg, benefit.ErrValidation, operation)
 	}
 	if registry == nil {
-		return benefit.OperationDecision{}, errors.New("benefit: constraint registry is nil")
+		return benefit.OperationDecision{}, constraint.ErrNilRegistry
 	}
 	if err := capabilities.Validate(); err != nil {
 		return benefit.OperationDecision{}, err
@@ -80,14 +81,14 @@ func validateOperationPoliciesAgainstCapabilities(
 	for _, policy := range policies {
 		capability, ok := capabilities.Get(policy.Operation)
 		if !ok {
-			const msg = "benefit: operation policy targets unsupported operation %q"
-			return fmt.Errorf(msg, policy.Operation)
+			const msg = "%w: operation policy targets unsupported operation %q"
+			return fmt.Errorf(msg, benefit.ErrValidation, policy.Operation)
 		}
 
 		for _, mode := range policy.MatchModes {
 			if !capability.SupportsMode(mode) {
-				const msg = "benefit: operation %q policy targets unsupported mode %q"
-				return fmt.Errorf(msg, policy.Operation, mode)
+				const msg = "%w: operation %q policy targets unsupported mode %q"
+				return fmt.Errorf(msg, benefit.ErrValidation, policy.Operation, mode)
 			}
 		}
 	}
