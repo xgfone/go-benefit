@@ -111,10 +111,14 @@ func unsupportedOperationDecision(
 	reason string,
 ) benefit.OperationDecision {
 	return benefit.OperationDecision{
-		Operation:   operation,
-		Mode:        mode,
-		Status:      benefit.OperationDecisionStatusUnsupported,
-		Diagnostic:  benefit.Diagnostic{Reason: reason},
-		Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusUnevaluated},
+		Operation: operation,
+
+		Mode:   mode,
+		Status: benefit.OperationDecisionStatusUnsupported,
+		Reason: reason,
+
+		Constraints: benefit.ConstraintReport{
+			Status: benefit.ConstraintReportStatusUnevaluated,
+		},
 	}
 }

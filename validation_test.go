@@ -137,57 +137,67 @@ func TestRequestValidation(t *testing.T) {
 	}{UserId: "U1"}
 	reference := benefit.BenefitReference{Value: "B1"}
 
-	if err := (benefit.RedeemRequest{
-		DriverRequest: benefit.DriverRequest{Input: driverInput},
-	}).Validate(); err == nil {
+	err := (benefit.RedeemRequest{Input: driverInput}).Validate()
+	if err == nil {
 		t.Fatal("redeem request without a benefit reference unexpectedly validated")
 	}
-	if err := (benefit.RedeemRequest{
-		DriverRequest: benefit.DriverRequest{Reference: reference, Input: driverInput},
-	}).Validate(); err != nil {
+
+	err = (benefit.RedeemRequest{
+		Reference: reference,
+		Input:     driverInput,
+	}).Validate()
+	if err != nil {
 		t.Fatalf("redeem request without an operation id failed: %v", err)
 	}
-	if err := (benefit.ReverseRequest{
+
+	err = (benefit.ReverseRequest{
 		ReversalId:   "RV1",
 		RedemptionId: "R1",
-	}).Validate(); err == nil {
+	}).Validate()
+	if err == nil {
 		t.Fatal("reverse request without a benefit reference unexpectedly validated")
 	}
-	if err := (benefit.ReverseRequest{
-		DriverRequest: benefit.DriverRequest{Reference: reference},
-	}).Validate(); err != nil {
+
+	err = (benefit.ReverseRequest{
+		Reference: reference,
+	}).Validate()
+	if err != nil {
 		t.Fatalf("reverse request without operation ids failed: %v", err)
 	}
+
 	for _, mode := range []benefit.OperationMode{
 		benefit.OperationModeReverseFull,
 		benefit.OperationModeReversePartial,
 	} {
-		if err := (benefit.ReverseRequest{
-			DriverRequest: benefit.DriverRequest{Reference: reference},
-			Mode:          mode,
-		}).Validate(); err != nil {
+		err = (benefit.ReverseRequest{
+			Reference: reference,
+			Mode:      mode,
+		}).Validate()
+		if err != nil {
 			t.Fatalf("reverse request mode %q failed: %v", mode, err)
 		}
 	}
-	if err := (benefit.ReverseRequest{
-		DriverRequest: benefit.DriverRequest{Reference: reference},
-		Mode:          "invalid",
-	}).Validate(); err == nil {
+
+	err = (benefit.ReverseRequest{
+		Reference: reference,
+		Mode:      "invalid",
+	}).Validate()
+	if err == nil {
 		t.Fatal("reverse request with invalid mode unexpectedly validated")
 	}
-	if !(benefit.BenefitReference{}).IsZero() || (benefit.BenefitReference{Value: "B1"}).IsZero() {
+
+	if !(benefit.BenefitReference{}).IsZero() ||
+		(benefit.BenefitReference{Value: "B1"}).IsZero() {
 		t.Fatal("benefit reference zero detection is incorrect")
 	}
 }
 
 func TestRequestJsonOmitsInProcessValues(t *testing.T) {
 	request := benefit.RedeemRequest{
-		DriverRequest: benefit.DriverRequest{
-			Reference: benefit.BenefitReference{Value: "BEARER-CODE"},
-			Input: struct {
-				MerchantId string
-			}{MerchantId: "M1"},
-		},
+		Reference: benefit.BenefitReference{Value: "BEARER-CODE"},
+		Input: struct {
+			MerchantId string
+		}{MerchantId: "M1"},
 		RedemptionId: "R1",
 	}
 	data, err := json.Marshal(request)
@@ -196,13 +206,17 @@ func TestRequestJsonOmitsInProcessValues(t *testing.T) {
 	}
 	encoded := string(data)
 	if encoded != `{"RedemptionId":"R1"}` ||
-		strings.Contains(encoded, "BEARER-CODE") || strings.Contains(encoded, "M1") {
+		strings.Contains(encoded, "BEARER-CODE") ||
+		strings.Contains(encoded, "M1") {
 		t.Fatalf("in-process values leaked into request JSON: %s", encoded)
 	}
 
 	reverseData, err := json.Marshal(benefit.ReverseRequest{
-		DriverRequest:        request.DriverRequest,
-		Mode:                 benefit.OperationModeReversePartial,
+		Reference: request.Reference,
+		Input:     request.Input,
+
+		Mode: benefit.OperationModeReversePartial,
+
 		ProviderRedemptionId: "PR1",
 	})
 	if err != nil {
@@ -215,7 +229,8 @@ func TestRequestJsonOmitsInProcessValues(t *testing.T) {
 
 func TestBenefitInfoMarshalsConstraintAndOperationPolicyDefinitions(t *testing.T) {
 	operationConstraint := benefit.Constraint{
-		Type:   "test.operation_rule",
+		Type: "test.operation_rule",
+
 		Params: jsontext.Value(`{"minimum":2}`),
 		Remark: "operation constraint",
 	}
@@ -242,6 +257,7 @@ func TestBenefitInfoMarshalsConstraintAndOperationPolicyDefinitions(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	encoded := string(data)
 	want := `{"Status":"active","DriverType":"test.coupon","Constraints":[{"Type":"test.provider_rule","Params":{"minimum":1},"Remark":"benefit constraint"}],"OperationPolicies":[{"Operation":"Reverse","MatchModes":["full"],"Constraints":[{"Type":"test.operation_rule","Params":{"minimum":2},"Remark":"operation constraint"}],"Remark":"operation policy"}]}`
 	if encoded != want {
@@ -253,10 +269,9 @@ func TestConstraintDecisionJsonContainsOnlyDecisionData(t *testing.T) {
 	decision := benefit.ConstraintDecision{
 		Type: "test.example",
 		Code: benefit.ConstraintDecisionUnsatisfied,
-		Diagnostic: benefit.Diagnostic{
-			Reason:  "test constraint was not satisfied",
-			Details: map[string]any{"source": "test"},
-		},
+
+		Reason:  "test constraint was not satisfied",
+		Details: map[string]any{"source": "test"},
 	}
 
 	data, err := json.Marshal(decision)
@@ -267,7 +282,8 @@ func TestConstraintDecisionJsonContainsOnlyDecisionData(t *testing.T) {
 	if !strings.Contains(encoded, `"Type":"test.example"`) ||
 		!strings.Contains(encoded, `"Code":"unsatisfied"`) ||
 		!strings.Contains(encoded, `"Reason":"test constraint was not satisfied"`) ||
-		strings.Contains(encoded, `"Constraint"`) || strings.Contains(encoded, `"Params"`) ||
+		strings.Contains(encoded, `"Constraint"`) ||
+		strings.Contains(encoded, `"Params"`) ||
 		strings.Contains(encoded, `"Remark"`) {
 		t.Fatalf("unexpected constraint decision JSON: %s", encoded)
 	}
@@ -276,7 +292,9 @@ func TestConstraintDecisionJsonContainsOnlyDecisionData(t *testing.T) {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if decoded.IsSatisfied() || decoded.Reason != decision.Reason || decoded.Type != decision.Type {
+	if decoded.IsSatisfied() ||
+		decoded.Type != decision.Type ||
+		decoded.Reason != decision.Reason {
 		t.Fatalf("unexpected decoded decision: %#v", decoded)
 	}
 }
@@ -284,16 +302,16 @@ func TestConstraintDecisionJsonContainsOnlyDecisionData(t *testing.T) {
 func TestFailureDiagnosticJson(t *testing.T) {
 	values := []any{
 		benefit.EvaluationFailure{
-			Code:       benefit.EvaluationFailureBenefitInactive,
-			Diagnostic: benefit.Diagnostic{Reason: "benefit status is expired"},
+			Code:   benefit.EvaluationFailureBenefitInactive,
+			Reason: "benefit status is expired",
 		},
 		benefit.RedeemFailure{
-			Code:       benefit.RedeemFailureProviderRejected,
-			Diagnostic: benefit.Diagnostic{Reason: "provider rejection code 42"},
+			Code:   benefit.RedeemFailureProviderRejected,
+			Reason: "provider rejection code 42",
 		},
 		benefit.ReversalFailure{
-			Code:       benefit.ReversalFailureReversalWindowExpired,
-			Diagnostic: benefit.Diagnostic{Reason: "reversal deadline was 2026-08-20T18:00:00+08:00"},
+			Code:   benefit.ReversalFailureReversalWindowExpired,
+			Reason: "reversal deadline was 2026-08-20T18:00:00+08:00",
 		},
 	}
 
@@ -303,8 +321,10 @@ func TestFailureDiagnosticJson(t *testing.T) {
 			t.Fatal(err)
 		}
 		encoded := string(data)
-		if !strings.Contains(encoded, `"Code":`) || !strings.Contains(encoded, `"Reason":`) ||
-			strings.Contains(encoded, `"Type":`) || strings.Contains(encoded, `"Detail":`) ||
+		if !strings.Contains(encoded, `"Code":`) ||
+			!strings.Contains(encoded, `"Reason":`) ||
+			strings.Contains(encoded, `"Type":`) ||
+			strings.Contains(encoded, `"Detail":`) ||
 			strings.Contains(encoded, `"Message":`) {
 			t.Fatalf("unexpected failure JSON: %s", encoded)
 		}
@@ -336,10 +356,12 @@ func TestBenefitInfoDoesNotValidateNoticeCodeFormat(t *testing.T) {
 	if err := info.Validate(); err != nil {
 		t.Fatalf("notice code format was unexpectedly validated: %v", err)
 	}
+
 	data, err := json.Marshal(info)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if !strings.Contains(string(data), `"Lang":"en-US"`) {
 		t.Fatalf("notice language was not encoded: %s", data)
 	}
@@ -361,7 +383,8 @@ func TestBenefitInfoRequiresNoticeLanguage(t *testing.T) {
 }
 
 func TestBenefitInfoRequiresDriverType(t *testing.T) {
-	if err := (benefit.BenefitInfo{Status: benefit.StatusActive}).Validate(); err == nil {
+	err := (benefit.BenefitInfo{Status: benefit.StatusActive}).Validate()
+	if err == nil {
 		t.Fatal("benefit info without a driver type unexpectedly validated")
 	}
 
@@ -370,10 +393,12 @@ func TestBenefitInfoRequiresDriverType(t *testing.T) {
 		DriverType:        "test.coupon",
 		Status:            benefit.StatusActive,
 	}
+
 	data, err := json.Marshal(info)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	encoded := string(data)
 	if !strings.Contains(encoded, `"ProviderBenefitId":"P1"`) ||
 		!strings.Contains(encoded, `"DriverType":"test.coupon"`) {
@@ -394,9 +419,11 @@ func TestBenefitRestorationMoneyJSON(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if string(data) != test.want {
 			t.Fatalf("encoded %s, want %s", data, test.want)
 		}
+
 		var decoded benefit.BenefitRestoration
 		if err = json.Unmarshal(data, &decoded); err != nil {
 			t.Fatal(err)

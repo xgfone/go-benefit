@@ -25,9 +25,8 @@ func EvaluateLocalEligibility(
 			Eligible: false,
 			Failure: &benefit.EvaluationFailure{
 				Code: benefit.EvaluationFailureBenefitInactive,
-				Diagnostic: benefit.Diagnostic{
-					Reason: fmt.Sprintf("benefit status is %q", input.Benefit.Status),
-				},
+
+				Reason: fmt.Sprintf("benefit status is %q", input.Benefit.Status),
 			},
 			Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusUnevaluated},
 		}, nil

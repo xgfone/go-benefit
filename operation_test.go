@@ -88,21 +88,34 @@ func TestOperationDecisionRejectsInvalidStatusCombination(t *testing.T) {
 		"empty operation": {Status: benefit.OperationDecisionStatusUnsupported},
 		"invalid status":  {Operation: benefit.OperationReverse, Status: "invalid"},
 		"unsupported with evaluated constraints": {
-			Operation: benefit.OperationReverse, Status: benefit.OperationDecisionStatusUnsupported,
-			Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusSatisfied},
+			Status:    benefit.OperationDecisionStatusUnsupported,
+			Operation: benefit.OperationReverse,
+			Constraints: benefit.ConstraintReport{
+				Status: benefit.ConstraintReportStatusSatisfied,
+			},
 		},
 		"ineligible without violation": {
-			Operation: benefit.OperationReverse, Status: benefit.OperationDecisionStatusIneligible,
-			Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusSatisfied},
+			Status:    benefit.OperationDecisionStatusIneligible,
+			Operation: benefit.OperationReverse,
+			Constraints: benefit.ConstraintReport{
+				Status: benefit.ConstraintReportStatusSatisfied,
+			},
 		},
 		"eligible with violation": {
-			Operation: benefit.OperationReverse, Status: benefit.OperationDecisionStatusEligible,
-			Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusUnsatisfied},
+			Status:    benefit.OperationDecisionStatusEligible,
+			Operation: benefit.OperationReverse,
+			Constraints: benefit.ConstraintReport{
+				Status: benefit.ConstraintReportStatusUnsatisfied,
+			},
 		},
 		"eligible with diagnostics": {
-			Operation: benefit.OperationReverse, Status: benefit.OperationDecisionStatusEligible,
-			Constraints: benefit.ConstraintReport{Status: benefit.ConstraintReportStatusSatisfied},
-			Diagnostic:  benefit.Diagnostic{Reason: "unexpected"},
+			Status: benefit.OperationDecisionStatusEligible,
+			Reason: "unexpected",
+
+			Operation: benefit.OperationReverse,
+			Constraints: benefit.ConstraintReport{
+				Status: benefit.ConstraintReportStatusSatisfied,
+			},
 		},
 	}
 	for name, decision := range tests {

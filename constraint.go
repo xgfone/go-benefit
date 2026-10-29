@@ -67,10 +67,9 @@ type ConstraintDecisionCode string
 func (c ConstraintDecisionCode) Decision(reason string, details map[string]any) ConstraintDecision {
 	return ConstraintDecision{
 		Code: c,
-		Diagnostic: Diagnostic{
-			Reason:  reason,
-			Details: details,
-		},
+
+		Reason:  reason,
+		Details: details,
 	}
 }
 
@@ -117,10 +116,9 @@ func ConstraintUnsatisfied(code ConstraintDecisionCode, reason string, details m
 
 	return ConstraintDecision{
 		Code: code,
-		Diagnostic: Diagnostic{
-			Reason:  reason,
-			Details: details,
-		},
+
+		Reason:  reason,
+		Details: details,
 	}
 }
 

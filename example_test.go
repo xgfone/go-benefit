@@ -249,7 +249,8 @@ func (d *exampleCouponDriver) Redeem(
 	}
 
 	evaluation, err := d.Evaluate(ctx, benefit.EvaluateRequest{
-		DriverRequest: request.DriverRequest,
+		Reference: request.Reference,
+		Input:     request.Input,
 	})
 	if err != nil {
 		return benefit.RedeemResult{}, err
@@ -341,7 +342,8 @@ func Example() {
 	}
 
 	info, err := driver.Inspect(ctx, benefit.InspectRequest{
-		DriverRequest: request,
+		Reference: request.Reference,
+		Input:     request.Input,
 	})
 	if err != nil {
 		panic(err)
@@ -349,7 +351,8 @@ func Example() {
 	fmt.Printf("inspect: %s (%s)\n", info.Name, info.Status)
 
 	evaluation, err := driver.Evaluate(ctx, benefit.EvaluateRequest{
-		DriverRequest: request,
+		Reference: request.Reference,
+		Input:     request.Input,
 	})
 	if err != nil {
 		panic(err)
@@ -364,7 +367,9 @@ func Example() {
 	)
 
 	redeemResult, err := driver.Redeem(ctx, benefit.RedeemRequest{
-		DriverRequest:   request,
+		Reference: request.Reference,
+		Input:     request.Input,
+
 		RedemptionId:    "redeem-1",
 		EvaluationToken: evaluation.EvaluationToken,
 	})
@@ -382,7 +387,9 @@ func Example() {
 		panic("driver does not implement its declared reverse operation")
 	}
 	reverseResult, err := reverser.Reverse(ctx, benefit.ReverseRequest{
-		DriverRequest:        request,
+		Reference: request.Reference,
+		Input:     request.Input,
+
 		Mode:                 benefit.OperationModeReverseFull,
 		ReversalId:           "reverse-1",
 		RedemptionId:         redeemResult.Redemption.RedemptionId,

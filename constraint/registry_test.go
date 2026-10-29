@@ -464,10 +464,9 @@ func TestConstraintRegistryValidatesDecisionCode(t *testing.T) {
 	) (benefit.ConstraintDecision, error) {
 		return benefit.ConstraintDecision{
 			Code: benefit.ConstraintDecisionSatisfied,
-			Diagnostic: benefit.Diagnostic{
-				Reason:  "must be discarded",
-				Details: map[string]any{"secret": "must be discarded"},
-			},
+
+			Reason:  "must be discarded",
+			Details: map[string]any{"secret": "must be discarded"},
 		}, nil
 	})); err != nil {
 		t.Fatal(err)
