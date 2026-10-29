@@ -40,7 +40,8 @@ go get github.com/xgfone/go-benefit
 | `github.com/xgfone/go-benefit/driver`     | Driver registration, descriptor snapshots, configuration validation, and binding                                                             |
 | `github.com/xgfone/go-benefit/constraint` | Constraint input, evaluator interfaces, registries, built-in rules, parameters, and extractors                                               |
 | `github.com/xgfone/go-benefit/evaluation` | Local eligibility, optional-operation availability, status resolution, and status-to-failure mapping                                         |
-| `github.com/xgfone/go-benefit/discount`   | Fixed-amount and percentage discount calculations                                                                                            |
+| `github.com/xgfone/go-benefit/discount`   | Fixed-amount and percentage calculations, and monetary outcome validation against trusted transaction facts                                  |
+| `github.com/xgfone/go-benefit/drivertest` | Reusable driver contract checks and isolated success-flow tests                                                                              |
 
 Drivers can implement the complete provider-facing contract by importing only
 `benefit`. The functional subpackages depend on the core; `evaluation` also
@@ -107,10 +108,32 @@ and must not retain it after the call.
 `DriverRequest` groups `BenefitReference` and `DriverInput`; each
 operation-specific request type embeds it by value.
 
-`Inspect` returns a normalized snapshot. `BenefitInfo.DriverType` identifies the
-driver; provider and kind metadata come from its `DriverDescriptor`.
-`ProviderBenefitId` is optional and must not contain a bearer secret. Drivers map
-raw provider states to normalized `Status` values and may retain non-standard
+This module targets Go 1.27 or newer. When constructing `InspectRequest`,
+`EvaluateRequest`, `RedeemRequest`, or `ReverseRequest`, initialize the
+promoted `Reference` and `Input` fields directly in the composite literal:
+
+```go
+req := benefit.RedeemRequest{
+    Reference:    benefit.BenefitReference{Value: "coupon-code"},
+    Input:        input,
+    RedemptionId: "redemption-001",
+}
+```
+
+Use this form in new or modified code, including examples and tests. Do not add
+an explicit `DriverRequest: benefit.DriverRequest{...}` wrapper or initialize
+`DriverRequest: common`; when reusing a common request, write
+`Reference: common.Reference` and `Input: common.Input` directly. Go 1.27 supports
+these promoted fields in composite literals, and the direct form avoids static
+analysis suggestions to simplify the embedded-field initializer. Keep the
+`DriverRequest` embedding in type definitions; this construction convention does
+not change request layout or serialization. AI agents must follow the same rule;
+see [AGENTS.md](AGENTS.md).
+
+`Inspect` returns a normalized snapshot. `BenefitInfo.DriverType` identifies
+the driver; provider and kind metadata come from its `DriverDescriptor`.
+`ProviderBenefitId` is optional and must not contain a bearer secret. Drivers
+map raw provider states to normalized `Status` values and may retain non-standard
 diagnostics in opaque `ProviderData`. When a reference does not resolve to a
 benefit, `Inspect` returns `ErrBenefitNotFound` and no `BenefitInfo`. This
 lookup outcome is not a benefit lifecycle status.
@@ -233,6 +256,21 @@ must be supplied even when it is zero. `discount.CalculatePercentage` accepts
 integer basis points of the amount saved (1000 saves 10%, 10000 is free), rounds
 down to minor units, and avoids floating-point arithmetic and integer overflow.
 
+`discount.Resolve(original, outcome)` validates a confirmed or evaluated monetary
+outcome against the trusted amount before that benefit. It requires `Discount`,
+checks its internal invariants, original amount and currency, and returns an
+independent effect with an upper-case currency. An omitted effect currency
+inherits the original transaction currency; it is not inferred from current
+product settings. Both currencies may remain empty when the application leaves
+them unspecified, so durable price consumers should provide a trusted currency.
+The helper never changes confirmed amounts, caps a discount, or interprets an
+absent effect as free. It does not interpret restoration resources as cash.
+
+```go
+effect, err := discount.Resolve(original, redeemed.Redemption.Outcome)
+// After checking err, use effect.PayableAmount without subtracting the discount again.
+```
+
 The meaning of an empty currency is field-specific and documented on its
 containing type. Drivers should resolve and emit currencies on durable outcomes
 when possible so the records remain self-contained. A `free` discount means the
@@ -265,6 +303,8 @@ Discount calculation errors distinguish `discount.ErrCurrencyMismatch`,
 `discount.ErrInvalidAmount`, `discount.ErrDiscountExceedsOriginal`, and
 `discount.ErrInvalidBasisPoints`; each also matches `benefit.ErrValidation`.
 Invalid currency syntax continues to match `benefit.ErrInvalidCurrency`.
+Monetary outcome resolution additionally distinguishes `discount.ErrMissingEffect`
+and `discount.ErrOriginalAmountMismatch`; these also match `benefit.ErrValidation`.
 
 Failure `Code` values are stable machine identifiers for program logic and
 client localization. `Diagnostic.Reason` and `Diagnostic.Details` contain
@@ -274,6 +314,22 @@ users. Diagnostic details must contain only non-sensitive data. Notice codes
 follow the same stable-localization principle, while notice text is user- or
 operator-facing information and carries its BCP 47 language tag in `Lang`.
 
+Apply the same Go 1.27+ promoted-field convention as `DriverRequest` to values
+embedding `Diagnostic`: initialize `Reason` and `Details` directly on the outer
+composite literal, rather than writing `Diagnostic: benefit.Diagnostic{...}`.
+When reusing a diagnostic value, use `Reason: diagnostic.Reason` and
+`Details: diagnostic.Details`. This applies to production code, examples, and
+tests; the embedded type definitions and standalone `Diagnostic` values remain
+unchanged.
+
+```go
+failure := benefit.RedeemFailure{
+    Code:    benefit.RedeemFailureProviderRejected,
+    Reason:  "provider rejected the request",
+    Details: map[string]any{"provider_code": 42},
+}
+```
+
 `RedemptionId` and `ReversalId` are optional caller-assigned correlation and
 idempotency IDs. When supplied, callers reuse the same ID when retrying an
 uncertain operation. Drivers pass it to providers as an idempotency key when
@@ -282,6 +338,19 @@ has no idempotency facility. Without an operation ID, the caller and driver
 can only rely on provider-side idempotency. In an idempotent implementation,
 a same-ID retry returns the original result rather than `benefit.redeemed`;
 the core package does not store operation results.
+
+`RedeemResult.Correlate(req)` and `ReverseResult.Correlate(req)` validate the
+request/result and return a result with missing caller IDs filled from the
+request. Non-empty conflicting caller IDs are rejected, including unsolicited
+IDs when the request supplied none. Reverse also rejects a non-empty returned
+`ProviderRedemptionId` different from a non-empty requested provider ID. Missing
+provider IDs stay missing. The original record is not modified; other immutable
+payloads may be shared. ID conflicts match both `ErrIdMismatch` and `ErrValidation`.
+
+Neither correlation nor monetary validation implements idempotency. They return
+zero results on error. An error detected after dispatch, including a malformed
+successful provider response, does not prove that the provider had no effect;
+hosts must preserve uncertainty instead of treating it as safe to retry.
 
 Provider-assigned IDs are separate from caller-assigned operation IDs. Redeem
 returns a `ProviderRedemptionId` when the provider supplies one. Reverse accepts
@@ -294,6 +363,32 @@ may ignore all redemption IDs and use only `BenefitReference`.
 `reversal.unsupported` means reversal capability is unavailable,
 `redemption.irreversible` applies to one specific redemption, and
 `reversal.window_expired` identifies an elapsed reversal window.
+
+## Driver contract tests
+
+Use `drivertest.Run(t, newFixture)` with a fresh, eligible, isolated provider
+fixture for every subtest. It checks descriptor/capability consistency, repeated
+read-only Inspect/Evaluate followed by Redeem, Redeem without Evaluate or a token,
+and full Reverse when declared. The reverse request uses the actual redemption's
+caller and provider IDs. `Fixture.Original` enables price-only assertions;
+leave it nil for non-monetary benefits. Fixtures declaring Reverse must supply
+`AssertRedeemed` and `AssertReversed` callbacks that verify actual provider state
+after success. These callbacks must check the fixture's expected consumption and
+resource restoration, not just response fields. They allow resource-specific rules
+without assuming restored resources equal transaction discounts or cash. A fixture
+missing either callback fails rather than silently skipping these checks.
+For drivers without Reverse, `AssertRedeemed` is optional.
+
+Fixtures can supply `InputSnapshot` and `ConsumptionSnapshot` callbacks returning
+independent snapshots. They enable input immutability and non-consumption checks;
+the package cannot generically clone arbitrary `DriverInput`. See the runnable
+[fixture test](drivertest/drivertest_test.go). Use `CheckEvaluation`, `CheckRedeem`,
+and `CheckReverse` in provider-specific rejection, pending, unknown, and failure
+cases. Check invocation errors and expected statuses separately. These helpers
+validate returned caller IDs directly; they do not repair a broken driver's IDs.
+They do not assume provider idempotency, implement persistence, or verify that
+a driver releases all references to input after returning. Provider wire-format
+and fault-injection tests remain the driver's responsibility.
 
 ## Composition and security
 
