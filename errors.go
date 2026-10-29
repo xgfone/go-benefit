@@ -10,6 +10,10 @@ var (
 	// More specific validation categories below also wrap ErrValidation.
 	ErrValidation = errors.New("benefit: validation failed")
 
+	// ErrIdMismatch reports a caller or provider operation ID inconsistent with
+	// the corresponding request. It does not imply that no remote effect occurred.
+	ErrIdMismatch = fmt.Errorf("%w: operation ID does not match request", ErrValidation)
+
 	// ErrInvalidDriverConfig reports malformed or rejected driver configuration.
 	// Driver registries preserve the definition's original validation or
 	// compilation error alongside this category.
